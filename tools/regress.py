@@ -490,6 +490,9 @@ def do_check_inputs():
     return 1 if (n_miss or n_mismatch or n_extra) else 0
 
 
+_PATH_REF = re.compile(r"(?:saves|tools|src|assets)/[^\s,:;\"'()]+")   # a repo file named in a check's argv or env
+
+
 def _input_origins():
     """{path: (kind, how)} of the inputs a recipe or a public source makes -- the classes of tools/input_provenance.py:
     a fixture of tools/fixtures/<domain>.json (a `peek` fixture's .wram/.vram/.oam sidecars too) or a battery save of
@@ -540,6 +543,11 @@ def do_refresh_input_hashes():
                     "size": None,
                     "present_when_recorded": False,
                 }
+        # a file the check runs or reads through its argv or env is read too (as tools/input_provenance.py finds them)
+        for a in c.get("argv", []) + list((c.get("env") or {}).values()):
+            for p in _PATH_REF.findall(str(a)):
+                if os.path.isfile(os.path.join(ROOT, p)):
+                    users.setdefault(p, set()).add(c["name"])
     origins = _input_origins()
     git = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True)
     tracked = set(git.stdout.splitlines()) if git.returncode == 0 else set()
@@ -553,10 +561,10 @@ def do_refresh_input_hashes():
         if p in origins:
             e["kind"], e["how"] = origins[p]
             e["regenerable"] = True
-        elif e["kind"] == "unknown" and p in tracked:     # code the check runs or reads: the commit's own file
+        elif e["kind"] == "unknown" and p in tracked:     # code the check runs or reads: restored by git, not made
             e["kind"] = "tool" if p.startswith("tools/") else "source"
             e["how"] = "In git: the file at the checked-out commit."
-            e["regenerable"] = True
+            e["regenerable"] = False
         elif e["kind"] == "unknown" and re.match(r"src/(data|xlat)/", p):
             e["kind"] = "generated"
             e["how"] = "Made from the ROM by `python tools/setup.py` (its generators, tools/gen/manifest*.json)."

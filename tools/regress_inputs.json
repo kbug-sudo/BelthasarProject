@@ -889,7 +889,7 @@
     {
       "path": "assets/text.py",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "assets-dialogue-every-script-box-reads-the-rom"
@@ -4273,6 +4273,7 @@
       "regenerable": true,
       "how": "Made from the ROM by `python tools/fixtures.py make`: recipe fxr_s439_marle_choice (tools/fixtures/rest.json)",
       "used_by": [
+        "field-decision-cursor-machine-0162",
         "field-textbox-typewriter-vs-oracle",
         "field-textbox-window-vs-oracle",
         "menu-naming-marle-direct-vs-oracle"
@@ -5218,7 +5219,7 @@
     {
       "path": "src/battle.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-field-anim-under-the-battle-vs-logical-oracle",
@@ -5233,7 +5234,7 @@
     {
       "path": "src/ct_vm.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-0e6-robots-snap-onto-their-tile-vs-oracle",
@@ -5294,7 +5295,7 @@
     {
       "path": "src/field.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-field-anim-under-the-battle-vs-logical-oracle",
@@ -5314,7 +5315,7 @@
     {
       "path": "src/title_intro.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "boot-title-opening-no-false-start-vs-rule-cartridge",
@@ -5333,7 +5334,7 @@
     {
       "path": "src/wipe.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-window-wipe-routine-and-mask-vs-oracle",
@@ -5347,7 +5348,7 @@
     {
       "path": "src/world.c",
       "kind": "source",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-ferry-both-ways-vs-rule-cartridge",
@@ -5404,7 +5405,7 @@
     {
       "path": "tools/attract_07d_staging_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-enemy-staging-vs-oracle"
@@ -5416,7 +5417,7 @@
     {
       "path": "tools/attract_0e6_exit_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-0e6-exit-fade-and-robot-depth-vs-rule-cartridge"
@@ -5476,7 +5477,7 @@
     {
       "path": "tools/attract_bg_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-0a5-halfcamera-bg2-vs-oracle",
@@ -5507,7 +5508,7 @@
     {
       "path": "tools/attract_fx_load_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-demo-battle-xstrike-fx-load-vs-oracle"
@@ -5519,7 +5520,7 @@
     {
       "path": "tools/attract_fx_sprite_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-frog-squash-eyes-vs-oracle"
@@ -5531,7 +5532,7 @@
     {
       "path": "tools/attract_playanim_list_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-playanim-list-vs-logical-oracle"
@@ -5555,9 +5556,27 @@
     {
       "path": "tools/battle_ab.py",
       "used_by": [
+        "battle-enemy-area-band-vs-oracle",
+        "battle-enemy-census-counter-eval-vs-oracle",
+        "battle-enemy-census-defeat-exit-tail-hdma-vs-oracle",
         "battle-enemy-census-feet-vs-oracle",
         "battle-enemy-census-mechanisms-vs-oracle",
+        "battle-enemy-census-movers-vs-oracle",
+        "battle-enemy-counter-path-vs-oracle",
+        "battle-enemy-turn-handlers-vs-oracle",
+        "battle-hud-aura-stash-strip-vs-oracle",
+        "battle-hud-item-list-gap-strip-vs-oracle",
+        "battle-hud-item-list-scrolled-strip-vs-oracle",
+        "battle-hud-tech-target-strip-vs-oracle",
+        "battle-hypno-wave-rings-rotate-vs-rule-cartridge",
+        "battle-item-lapis-every-seat-vs-oracle",
+        "battle-item-megalixir-every-seat-vs-oracle",
+        "battle-item-scrolled-record-vs-oracle",
         "battle-lost-fight-continues-vs-oracle",
+        "battle-menu-cursor-per-seat-vs-oracle",
+        "battle-menu-item-list-scroll-vs-oracle",
+        "battle-menu-item-stash-vs-oracle",
+        "battle-menu-target-stash-vs-oracle",
         "battle-module-tail-vs-oracle",
         "battle-victory-teardown-frames-vs-oracle"
       ],
@@ -5571,7 +5590,7 @@
     {
       "path": "tools/battle_feet_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-forest-feet-vs-oracle",
@@ -5585,7 +5604,7 @@
     {
       "path": "tools/battle_field_anim_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-07d-field-anim-under-the-battle-vs-logical-oracle"
@@ -5597,7 +5616,7 @@
     {
       "path": "tools/battle_jsl_audio_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-jsl-audio-keeps-playing"
@@ -5609,7 +5628,7 @@
     {
       "path": "tools/battle_lost_continue_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-lost-fight-continues-vs-oracle"
@@ -5633,7 +5652,7 @@
     {
       "path": "tools/battle_pilot.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "playthrough-legs-vs-rule-cartridge"
@@ -5645,7 +5664,7 @@
     {
       "path": "tools/battle_status_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-status-machinery-under-the-rule-vs-oracle",
@@ -5658,7 +5677,7 @@
     {
       "path": "tools/battle_victory_teardown_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-victory-teardown-frames-vs-oracle"
@@ -5670,7 +5689,7 @@
     {
       "path": "tools/boot_title_open_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "boot-title-opening-no-false-start-vs-rule-cartridge"
@@ -5682,7 +5701,7 @@
     {
       "path": "tools/cyclone_blink_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-anim-op6c-cyclone-blink-vs-oracle"
@@ -5706,7 +5725,7 @@
     {
       "path": "tools/dialogue_refs_check.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "assets-dialogue-every-script-box-reads-the-rom"
@@ -5730,7 +5749,7 @@
     {
       "path": "tools/dragon_tank_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-dragon-tank-bridge-vs-rule-cartridge"
@@ -5766,7 +5785,7 @@
     {
       "path": "tools/ending_stage_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ending-stage-logic-ff2a-ff2f-vs-oracle",
@@ -5781,12 +5800,13 @@
     {
       "path": "tools/enemy_cells_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-enemy-cells-bat2-vs-oracle",
         "battle-enemy-cells-bat9-vs-oracle",
-        "battle-enemy-cells-zombor-vs-oracle"
+        "battle-enemy-cells-zombor-vs-oracle",
+        "battle-hetake-idle-poses-from-the-users-cartridge-save"
       ],
       "sha256": "5ea56f5a6b2c712bd9cd2a0d755c7c918af86c90e966e900b0c58159cd24e589",
       "size": 7166,
@@ -5795,7 +5815,7 @@
     {
       "path": "tools/entry3_stage_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-entry3-stage-picture-vs-oracle"
@@ -5807,7 +5827,7 @@
     {
       "path": "tools/epoch_board_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-black-omen-rising-vs-oracle",
@@ -5827,7 +5847,7 @@
     {
       "path": "tools/ferry_ride_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-ferry-both-ways-vs-rule-cartridge"
@@ -5839,7 +5859,7 @@
     {
       "path": "tools/field_colcircle_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-colour-circle-c0-232a-238a-vs-rule-cartridge"
@@ -5851,7 +5871,7 @@
     {
       "path": "tools/field_plane_cutscene_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-plane-survives-a-cutscene-vs-logical-oracle"
@@ -5863,17 +5883,25 @@
     {
       "path": "tools/frame_region_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "attract-01c-dragon-tank-tail-vs-oracle",
         "attract-07d-field-objects-take-the-battle-pose-vs-oracle",
         "attract-07d-frog-squash-bg3-priority-vs-oracle",
+        "attract-07d-frog-squash-colours-vs-oracle",
         "attract-07d-hench-keep-the-frog-squash-pose-vs-oracle",
         "attract-07d-lead-keeps-the-battle-pose-until-the-drain-vs-oracle",
+        "attract-087-ice-crystal-vs-oracle",
+        "attract-0ad-hud-close-no-blink-vs-oracle",
         "attract-0e6-robots-snap-onto-their-tile-vs-oracle",
         "attract-0e6-sprite-depth-is-the-rom-draw-list-vs-rule-cartridge",
         "attract-112-walk-vs-rule-cartridge",
+        "attract-1b0-cockpit-pcs-behind-console-vs-oracle",
+        "attract-1f0-epoch-departure-vs-oracle",
+        "attract-1f0-epoch-return-vs-oracle",
+        "attract-1f7-lavos-fragments-vs-oracle",
+        "attract-1f7-no-lead-sprite-vs-oracle",
         "attract-demo-battle-flea-drawn-vs-oracle",
         "ending-ff2b-story-picture-in-the-port-vs-oracle",
         "ending-ff2e-story-picture-in-the-port-vs-oracle",
@@ -5893,7 +5921,7 @@
     {
       "path": "tools/fxobj_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-fxobj-machine-cyclone-vs-oracle",
@@ -5931,7 +5959,7 @@
     {
       "path": "tools/gen/shapes.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "gen-shapes-match-generated"
@@ -5943,7 +5971,7 @@
     {
       "path": "tools/hdma_build_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-hdma-builder-native-vs-cartridge-census"
@@ -5955,7 +5983,7 @@
     {
       "path": "tools/inn_sleep_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-inn-sleep-vs-rule-cartridge"
@@ -5979,7 +6007,7 @@
     {
       "path": "tools/input_provenance.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "inputs-come-from-recipes-or-sources"
@@ -5991,7 +6019,7 @@
     {
       "path": "tools/jackie_census_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "jackie-saves-census-vs-oracle"
@@ -6008,7 +6036,55 @@
       "used_by": [
         "field-bg-seed-loc13B-colour-cycle-vs-oracle",
         "field-bg-seed-party3-vs-oracle",
-        "field-bg-seed-tent-keeper-vs-oracle"
+        "field-bg-seed-tent-keeper-vs-oracle",
+        "menu-config-cursor-memory-toggle-vs-oracle",
+        "menu-config-every-cell-vs-oracle",
+        "menu-config-form-tour-vs-oracle",
+        "menu-config-pad-editor-and-option-row-vs-oracle",
+        "menu-config-window-colour-vs-oracle",
+        "menu-equip-entry-exit-lead-vs-oracle",
+        "menu-equip-list-commit-vs-oracle",
+        "menu-equip-list-draws-no-count-vs-oracle",
+        "menu-equip-list-one-row-slide-vs-oracle",
+        "menu-equip-list-scrollbar-and-page-vs-oracle",
+        "menu-equip-list-slide-draws-no-count-vs-oracle",
+        "menu-equip-lr-member-switch-vs-oracle",
+        "menu-equip-member-scroll-both-ways-vs-oracle",
+        "menu-equip-preview-max-hp-and-typed-description-vs-oracle",
+        "menu-equip-push-member2-vs-oracle",
+        "menu-equip-push-member3-vs-oracle",
+        "menu-equip-reserve-member-gear-panel-vs-oracle",
+        "menu-equip-whole-roster-member-select-vs-oracle",
+        "menu-form-swap-vs-oracle",
+        "menu-item-all-party-hands-vs-oracle",
+        "menu-item-info-panel-vs-oracle",
+        "menu-item-list-slide-and-page-vs-oracle",
+        "menu-item-list-slide-with-a-pick-vs-oracle",
+        "menu-item-magic-tab-second-target-vs-oracle",
+        "menu-item-move-vs-oracle",
+        "menu-item-pick-empty-slot-vs-oracle",
+        "menu-item-power-tab-vs-oracle",
+        "menu-item-tab-at-cap-buzz-vs-oracle",
+        "menu-item-tonic-use-vs-oracle",
+        "menu-item-tour-vs-oracle",
+        "menu-overworld-save-screen-vs-oracle",
+        "menu-panel-effective-max-hp-and-critical-hp-vs-oracle",
+        "menu-ribbon-reopens-on-remembered-tab-vs-oracle",
+        "menu-save-overwrite-prompt-frames-vs-oracle",
+        "menu-save-slot-colours-and-post-save-frames-vs-oracle",
+        "menu-shop-buy-list-scrollbar-slide-page-vs-oracle",
+        "menu-shop-equip-list-scrollbar-slide-vs-oracle",
+        "menu-shop-sell-list-scrollbar-slide-page-vs-oracle",
+        "menu-tech-cast-vs-oracle",
+        "menu-tech-dual-list-partner-sprite-and-tab-memory-vs-oracle",
+        "menu-tech-mp-used-short-in-red-vs-oracle",
+        "menu-tech-reserve-caster-vs-oracle",
+        "menu-tech-skill-pts-block-vs-oracle",
+        "menu-tech-tour-vs-oracle",
+        "menu-tech-whole-roster-member-select-vs-oracle",
+        "menu-window-colour-dim-rebuild-vs-oracle",
+        "menu-window-colour-field-textbox-vs-oracle",
+        "menu-window-colour-saved-vs-oracle"
       ],
       "sha256": "b38352e921fbf7fca91f85031ca8deb1f5cf6f2133738afb769410c760b60d2a",
       "size": 43042,
@@ -6017,7 +6093,7 @@
     {
       "path": "tools/menu_exchange_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "menu-exchange-vs-oracle"
@@ -6029,7 +6105,7 @@
     {
       "path": "tools/menu_exchange_pic_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "menu-exchange-picture-vs-oracle"
@@ -6041,7 +6117,7 @@
     {
       "path": "tools/naga_firewhirl_pose_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-naga-ettes-hold-their-poses-through-fire-whirl-vs-oracle"
@@ -6065,7 +6141,7 @@
     {
       "path": "tools/native_fx_check.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-native-frames-between-over-the-iris-colour-window-captions"
@@ -6089,7 +6165,7 @@
     {
       "path": "tools/ocean_aftermath_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ocean-palace-aftermath-chain-vs-oracle"
@@ -6101,7 +6177,7 @@
     {
       "path": "tools/options_overlay_check.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "options-overlay-reads-the-settings-file"
@@ -6113,7 +6189,7 @@
     {
       "path": "tools/ow_banner_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-place-name-banner-vs-rule-cartridge"
@@ -6125,7 +6201,7 @@
     {
       "path": "tools/ow_bootstrap_sets.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-object-bootstrap-set-vs-oracle"
@@ -6137,7 +6213,7 @@
     {
       "path": "tools/ow_event_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-event-cell-600ad-scene097-vs-oracle",
@@ -6175,7 +6251,7 @@
     {
       "path": "tools/ow_wave_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-1f5-wave-and-light-vs-oracle"
@@ -6187,7 +6263,7 @@
     {
       "path": "tools/owwin_step_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-window-object-routine-and-mask-vs-oracle"
@@ -6199,7 +6275,7 @@
     {
       "path": "tools/playthrough.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "playthrough-legs-vs-rule-cartridge"
@@ -6211,7 +6287,7 @@
     {
       "path": "tools/playthrough/route.txt",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "playthrough-legs-vs-rule-cartridge"
@@ -6223,7 +6299,7 @@
     {
       "path": "tools/private_captures.json",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "inputs-come-from-recipes-or-sources"
@@ -6235,7 +6311,7 @@
     {
       "path": "tools/race_scripts_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "race-scripts-vs-oracle"
@@ -6247,7 +6323,7 @@
     {
       "path": "tools/race_stage_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "race-stage-logic-vs-oracle"
@@ -6259,7 +6335,7 @@
     {
       "path": "tools/race_step_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "race-scripts-vs-oracle",
@@ -6274,7 +6350,7 @@
     {
       "path": "tools/rom_free_gate.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "rom-free-no-dump-gate"
@@ -6286,7 +6362,7 @@
     {
       "path": "tools/seq_hdma_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "seq-hdma-walker-vs-oracle"
@@ -6334,7 +6410,7 @@
     {
       "path": "tools/sound_post_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "sound-posts-lavos-chain-vs-oracle"
@@ -6346,10 +6422,12 @@
     {
       "path": "tools/stage_rule_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
-        "attract-entry3-stage-picture-vs-oracle"
+        "attract-entry3-stage-every-frame-under-the-rule",
+        "attract-entry3-stage-picture-vs-oracle",
+        "attract-race-stage-every-frame-under-the-rule"
       ],
       "sha256": "c4164258351c1645e9235793e6af752ff9400a151d4666763c86e9f7231218d0",
       "size": 10098,
@@ -6358,7 +6436,7 @@
     {
       "path": "tools/sync_free_check.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "options-free-sync-skips-the-hardware-waits"
@@ -6370,7 +6448,7 @@
     {
       "path": "tools/textbox_rule_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-textbox-under-the-rule-vs-logical-oracle"
@@ -6382,7 +6460,7 @@
     {
       "path": "tools/third_party_saves.json",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "inputs-come-from-recipes-or-sources"
@@ -6394,7 +6472,7 @@
     {
       "path": "tools/ti_sim.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "title-intro-machine-vs-oracle-wram"
@@ -6406,7 +6484,7 @@
     {
       "path": "tools/vwf_cost_proto.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "ow-event-cell-600ad-scene097-vs-oracle",
@@ -6419,7 +6497,7 @@
     {
       "path": "tools/walkto.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "playthrough-legs-vs-rule-cartridge"
@@ -6431,7 +6509,7 @@
     {
       "path": "tools/wide_box_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "wide-box-is-the-vanilla-box-at-a-rooms-edge"
@@ -6443,7 +6521,7 @@
     {
       "path": "tools/wide_curtain_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "wide-race-curtain-crosses-the-whole-picture"
@@ -6455,7 +6533,7 @@
     {
       "path": "tools/widescreen_check.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "options-widescreen-view-equals-the-256-picture"
@@ -6467,7 +6545,7 @@
     {
       "path": "tools/wipe_step_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-window-wipe-routine-and-mask-vs-oracle"
@@ -6479,7 +6557,7 @@
     {
       "path": "tools/wram_peek.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "field-07d-obj8-spawns-on-lead-vs-oracle",
@@ -6491,9 +6569,21 @@
       "present_when_recorded": true
     },
     {
+      "path": "tools/yakra_cmp.py",
+      "kind": "tool",
+      "regenerable": false,
+      "how": "The Yakra fight comparison (stages the id poke on both sides; disasm/notes/battle_yakra.md).",
+      "used_by": [
+        "battle-yakra-fight-vs-logical-oracle"
+      ],
+      "sha256": "6972b8a8828a19e7763050a09a926223e6269bc4a11c8c944e9131af27795a6b",
+      "size": 8501,
+      "present_when_recorded": true
+    },
+    {
       "path": "tools/zombor_fxprog_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-fxprog-zombor-aa-mode4-shake"
@@ -6505,7 +6595,7 @@
     {
       "path": "tools/zombor_hopslide_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-anim-hopslide-ops-d2-d3-d7-vs-oracle"
@@ -6517,7 +6607,7 @@
     {
       "path": "tools/zombor_orbit_cmp.py",
       "kind": "tool",
-      "regenerable": true,
+      "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "battle-anim-orbit-op-c1-vs-oracle"
