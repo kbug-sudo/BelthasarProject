@@ -2686,7 +2686,7 @@ The offline renderer of the remaster's audio export (src/sound/render.c), on a f
 same song's voice 1 alone, the voice mask the export writes stems with), `snd-render-sfx-field` and
 `snd-render-sfx-battle` (effect $02 of the field's resident set and of the battle's, uploaded by command `$70 $01`: they
 sound differently), `snd-render-sfx-set-range` (any other set is refused, not rendered as the battle's) and
-`snd-render-brr-decode` (instrument $2C by the mixer's own BRR decoder). Each pins the summary line with an FNV-1a/32 of
-the PCM; their mutations hit the loop snapshot, the pan, the end test, the set upload, the voice mask and the BRR filter.
+`snd-render-brr-decode` (instrument $2C by the mixer's own BRR decoder). Each render pins its summary line with an
+FNV-1a/32 of the PCM, and set-range its FAIL line (regress grades the output, not the exit code); their mutations hit the loop snapshot, the pan, the end test, the set upload, the voice mask and the BRR filter.
 Re-pin only for an intentional change to the sound machine that its own checks (snd-machine-*, mixer-*) validate. Nothing
 here changes how the game runs.

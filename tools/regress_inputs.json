@@ -2566,7 +2566,7 @@
     },
     {
       "path": "saves/battle_re/gato_t0.raw.oam",
-      "kind": "fixture_peek.oam",
+      "kind": "fixture_peek_oam",
       "regenerable": true,
       "how": "Made from the ROM by `python tools/fixtures.py make`: recipe fx_a_battle_gato_press_action + its pad script (tools/fixtures/battle.json)",
       "used_by": [
@@ -2578,7 +2578,7 @@
     },
     {
       "path": "saves/battle_re/gato_t0.raw.vram",
-      "kind": "fixture_peek.vram",
+      "kind": "fixture_peek_vram",
       "regenerable": true,
       "how": "Made from the ROM by `python tools/fixtures.py make`: recipe fx_a_battle_gato_press_action + its pad script (tools/fixtures/battle.json)",
       "used_by": [
@@ -2662,7 +2662,7 @@
         "menu-tech-screen",
         "menusave-ow-open"
       ],
-      "kind": "fixture_peek.wram",
+      "kind": "fixture_peek_wram",
       "regenerable": true,
       "how": "Made from the ROM by `python tools/fixtures.py make`: recipe fx_a_battle_gato_press_action + its pad script (tools/fixtures/battle.json)",
       "sha256": "cda2c8bf20d5c9aef01132f5ad5eb09e1f15e6d6625ab3dd5b6af7a54b769c10",
@@ -3235,7 +3235,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch02.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie02-QueenReturns.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3247,7 +3247,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch04.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie04-WereBack.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "ow-event-cell-heckran-whirlpool-vs-oracle"
       ],
@@ -3259,7 +3259,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch10.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie10-HeroAppears.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle",
         "ow-event-cell-600ad-scene097-vs-oracle"
@@ -3272,7 +3272,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch13.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie13-FootstepsFollow.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3284,7 +3284,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch16.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie16-ForwardtoPast.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3296,7 +3296,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch17.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie17-UnnaturalSel.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "ow-dactyl-ride-vs-oracle"
       ],
@@ -3308,7 +3308,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch19.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie19-BreaktheSeal.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3320,7 +3320,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch21.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie21-WhatLiesBeyond.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3332,7 +3332,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch23.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie23-TheNewKing.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle"
       ],
@@ -3344,7 +3344,7 @@
       "path": "saves/downloaded/ctjackie/srm/ch24.srm",
       "kind": "public_save",
       "regenerable": true,
-      "how": "A public battery save: `python tools/fetch_saves.py` downloads it and checks its SHA-256 (tools/third_party_saves.json)",
+      "how": "A public battery save: `python tools/fetch_saves.py` extracts it from saves/downloaded/ctjackie/zip/ctjackie24-TheTimeEgg.zip and checks its SHA-256 (tools/third_party_saves.json)",
       "used_by": [
         "jackie-saves-census-vs-oracle",
         "ow-black-omen-rising-vs-oracle",

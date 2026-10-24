@@ -506,13 +506,15 @@ def _input_origins():
                        % (e["recipe"], " + its pad script" if e.get("pad") else "", domain))
                 out[e["path"]] = ("fixture_" + e["kind"], how)
                 if e["kind"] == "peek":
-                    for x in (".wram", ".vram", ".oam"):
-                        out[e["path"] + x] = ("fixture_peek" + x, how)
+                    for x in ("wram", "vram", "oam"):
+                        out[e["path"] + "." + x] = ("fixture_peek_" + x, how)
     with open(os.path.join(ROOT, "tools", "third_party_saves.json"), encoding="utf-8") as f:
         for e in json.load(f)["files"]:
-            for p in [e["path"]] + [x["path"] for x in e.get("extract", [])]:
-                out[p] = ("public_save", "A public battery save: `python tools/fetch_saves.py` downloads it and checks "
-                                         "its SHA-256 (tools/third_party_saves.json)")
+            out[e["path"]] = ("public_save", "A public battery save: `python tools/fetch_saves.py` downloads it and "
+                                             "checks its SHA-256 (tools/third_party_saves.json)")
+            for x in e.get("extract", []):
+                out[x["path"]] = ("public_save", "A public battery save: `python tools/fetch_saves.py` extracts it from "
+                                                 "%s and checks its SHA-256 (tools/third_party_saves.json)" % e["path"])
     return out
 
 
@@ -549,8 +551,11 @@ def do_refresh_input_hashes():
                 if os.path.isfile(os.path.join(ROOT, p)):
                     users.setdefault(p, set()).add(c["name"])
     origins = _input_origins()
-    git = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True)
-    tracked = set(git.stdout.splitlines()) if git.returncode == 0 else set()
+    try:
+        git = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True)
+        tracked = set(git.stdout.splitlines()) if git.returncode == 0 else set()
+    except OSError:                                  # no git here: tracked code keeps the kind it has
+        tracked = set()
     for p in sorted(by_path):
         if p not in users:
             print("  drop  %s  (no check reads it)" % p)
