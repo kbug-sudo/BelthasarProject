@@ -30,6 +30,7 @@ manifest (when a pin is recorded). See docs/TESTING.md and tools/regress_inputs.
 
 import argparse
 import concurrent.futures
+import glob
 import hashlib
 import json
 import os
@@ -489,8 +490,33 @@ def do_check_inputs():
     return 1 if (n_miss or n_mismatch or n_extra) else 0
 
 
+def _input_origins():
+    """{path: (kind, how)} of the inputs a recipe or a public source makes -- the classes of tools/input_provenance.py:
+    a fixture of tools/fixtures/<domain>.json (a `peek` fixture's .wram/.vram/.oam sidecars too) or a battery save of
+    tools/third_party_saves.json."""
+    out = {}
+    for p in sorted(glob.glob(os.path.join(ROOT, "tools", "fixtures", "*.json"))):
+        domain = os.path.splitext(os.path.basename(p))[0]
+        with open(p, encoding="utf-8") as f:
+            for e in json.load(f)["fixtures"]:
+                how = ("Made from the ROM by `python tools/fixtures.py make`: recipe %s%s (tools/fixtures/%s.json)"
+                       % (e["recipe"], " + its pad script" if e.get("pad") else "", domain))
+                out[e["path"]] = ("fixture_" + e["kind"], how)
+                if e["kind"] == "peek":
+                    for x in (".wram", ".vram", ".oam"):
+                        out[e["path"] + x] = ("fixture_peek" + x, how)
+    with open(os.path.join(ROOT, "tools", "third_party_saves.json"), encoding="utf-8") as f:
+        for e in json.load(f)["files"]:
+            for p in [e["path"]] + [x["path"] for x in e.get("extract", [])]:
+                out[p] = ("public_save", "A public battery save: `python tools/fetch_saves.py` downloads it and checks "
+                                         "its SHA-256 (tools/third_party_saves.json)")
+    return out
+
+
 def do_refresh_input_hashes():
-    """Rewrite sha256/size/present_when_recorded for every catalogued path that exists."""
+    """Rewrite sha256/size/present_when_recorded for every catalogued path that exists, `used_by` from the checks as
+    they are, the kind and provenance of the inputs a recipe or a public source makes, and drop the entries no check
+    reads any more (a check moved to a recipe-made twin)."""
     man = load_inputs_manifest()
     if not man:
         print("regress: missing %s" % INPUTS_JSON)
@@ -498,9 +524,11 @@ def do_refresh_input_hashes():
     # Merge any checks.json inputs that are not yet catalogued.
     checks = load_checks()
     by_path = {e["path"].replace("\\", "/"): e for e in man.get("inputs", [])}
+    users = {}
     for c in checks["checks"]:
         for p in c.get("inputs", []):
             p = p.replace("\\", "/")
+            users.setdefault(p, set()).add(c["name"])
             if p not in by_path:
                 by_path[p] = {
                     "path": p,
@@ -512,9 +540,27 @@ def do_refresh_input_hashes():
                     "size": None,
                     "present_when_recorded": False,
                 }
-            if c["name"] not in by_path[p].setdefault("used_by", []):
-                by_path[p]["used_by"].append(c["name"])
-                by_path[p]["used_by"] = sorted(by_path[p]["used_by"])
+    origins = _input_origins()
+    git = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True)
+    tracked = set(git.stdout.splitlines()) if git.returncode == 0 else set()
+    for p in sorted(by_path):
+        if p not in users:
+            print("  drop  %s  (no check reads it)" % p)
+            del by_path[p]
+            continue
+        e = by_path[p]
+        e["used_by"] = sorted(users[p])
+        if p in origins:
+            e["kind"], e["how"] = origins[p]
+            e["regenerable"] = True
+        elif e["kind"] == "unknown" and p in tracked:     # code the check runs or reads: the commit's own file
+            e["kind"] = "tool" if p.startswith("tools/") else "source"
+            e["how"] = "In git: the file at the checked-out commit."
+            e["regenerable"] = True
+        elif e["kind"] == "unknown" and re.match(r"src/(data|xlat)/", p):
+            e["kind"] = "generated"
+            e["how"] = "Made from the ROM by `python tools/setup.py` (its generators, tools/gen/manifest*.json)."
+            e["regenerable"] = True
     n_upd = n_miss = 0
     for path in sorted(by_path):
         e = by_path[path]

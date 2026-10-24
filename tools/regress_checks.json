@@ -46381,6 +46381,168 @@
       ]
     },
     {
+      "name": "snd-render-sfx-field",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "sfx",
+        "0",
+        "02",
+        "180",
+        "-"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: sfx set 0 id 02 mask FF samples 96113 peak 7607 end 4510 loop -1 -1 position -1 -1 keyed 03,04 fnv F835DCEB"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "field effect $02 rendered offline from the ROM: the effect command $18 (voices 7-6, pan $80) through the game's service on a fresh sound machine, 180 frames; where its tracks are done and its voices silent, the samples it keys and the PCM's hash",
+      "notes": "src/sound/render.c CtSndRender's sfx path (set 0: the set the driver's upload leaves resident), the renderer of the remaster's effects export (CC_Remaster_Project tools/ctaudio). Nothing in it changes how the game runs.",
+      "mutations": [
+        {
+          "file": "src/sound/render.c",
+          "find": "      wram[0x1E00] = 0x18; wram[0x1E01] = (uint8_t)id; wram[0x1E02] = 0x80; wram[0x1E03] = 0;",
+          "replace": "      wram[0x1E00] = 0x18; wram[0x1E01] = (uint8_t)id; wram[0x1E02] = 0x00; wram[0x1E03] = 0; /* MUT */",
+          "why": "the effect panned hard left instead of the centre $80 the field posts"
+        },
+        {
+          "file": "src/sound/render.c",
+          "find": "    if (ram[0x86]) r->everPlayed = 1;",
+          "replace": "    if (ram[0x53]) r->everPlayed = 1; /* MUT */",
+          "why": "the effect judged by the music tracks ($53) instead of its own ($86): it never counts as played, so no end is found (the voices-sounding half of the end test is not observable: in all 63 field effects the voices are silent when $86 clears)"
+        }
+      ]
+    },
+    {
+      "name": "snd-render-sfx-battle",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "sfx",
+        "1",
+        "02",
+        "180",
+        "-"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: sfx set 1 id 02 mask FF samples 96111 peak 8852 end 4546 loop -1 -1 position -1 -1 keyed 03,04 fnv AC191BB8"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "battle effect $02 rendered offline from the ROM: command $70 $01 uploads the battle's effect set (C7/08E3, set B to $2F00), then the effect command $18 as for the field; it sounds unlike field effect $02 (another hash, another peak)",
+      "notes": "src/sound/render.c CtSndRender's sfx path, set 1. The old code took any non-zero set as the battle's (see snd-render-sfx-set-range).",
+      "mutations": [
+        {
+          "file": "src/sound/render.c",
+          "find": "    if (set) {                                        // the battle's effect set: command $70 through the service",
+          "replace": "    if (0) { /* MUT */",
+          "why": "the battle set never uploaded: set 1 renders the field's effect"
+        },
+        {
+          "file": "src/sound/render.c",
+          "find": "      wram[0x1E00] = 0x70; wram[0x1E01] = 0x01; wram[0x1E02] = wram[0x1E03] = 0;",
+          "replace": "      wram[0x1E00] = 0x70; wram[0x1E01] = 0x00; wram[0x1E02] = wram[0x1E03] = 0; /* MUT */",
+          "why": "command $70 with operand $00 instead of the battle set $01"
+        }
+      ]
+    },
+    {
+      "name": "snd-render-song-stem",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "song",
+        "04",
+        "600",
+        "-",
+        "02"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: song 04 mask 02 samples 320398 peak 6057 tempo 81 end -1 loop -1 -1 position -1 -1 tracks -1:-1,-1:-1,-1:-1,-1:-1,-1:-1,-1:-1,-1:-1,-1:-1 keyed 20,21,22,23,24,25,26,27 fnv 697402E9"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "song $04's voice 1 alone (voice mask $02), 600 frames: the stem the remaster's audio export writes per voice; the driver runs as for the full mix (it keys the same samples) and only voice 1 reaches the main mix and the echo input",
+      "notes": "src/sound/render.c (the mask into CtMixer.voiceMask) and src/sound/mixer.c (the voice's gate before the main mix). The full mix of the same song is snd-render-song-loop.",
+      "mutations": [
+        {
+          "file": "src/sound/render.c",
+          "find": "  m->mx.voiceMask = (uint8_t)mask;",
+          "replace": "  m->mx.voiceMask = 0xFF; /* MUT */",
+          "why": "the mask ignored: the stem is the full mix"
+        },
+        {
+          "file": "src/sound/mixer.c",
+          "find": "  if (!(m->voiceMask & (1 << ch))) return;",
+          "replace": "  if (0) return; /* MUT */",
+          "why": "the mixer's voice gate removed: every voice reaches the mix whatever the mask"
+        }
+      ]
+    },
+    {
+      "name": "snd-render-sfx-set-range",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "sfx",
+        "2",
+        "02",
+        "180",
+        "-"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: sfx set 2 FAIL (set 0 is the field's effects, 1 the battle's)"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "an effect set other than 0 (field) and 1 (battle) is refused, not rendered as the battle set",
+      "notes": "src/sound/render.c CtSndRender. The old code posted $70 $01 for any non-zero set and printed the set it was given, so `sfx 2` was the battle set labelled 2 (the Gate 1 review of the remaster, 2026-10-24).",
+      "mutations": [
+        {
+          "file": "src/sound/render.c",
+          "find": "  if (set != 0 && set != 1) {",
+          "replace": "  if (0) { /* MUT */",
+          "why": "the guard removed: set 2 renders as the battle set again"
+        }
+      ]
+    },
+    {
       "name": "gen-shapes-match-generated",
       "argv": [
         "python",

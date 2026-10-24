@@ -28,8 +28,9 @@
 // track 7 is 2 steps short of the others' 3840 and drifts): their whole state comes back only at the lengths' common
 // multiple, past any render, while the tracks that carry the tune share one loop.
 //
-// SFX: the same fresh CtAudio; set 1 is the battle's effect set (command $70 $01, C7/08E3, which uploads set B to
-// $2F00); then command $18 (voices 7-6) with the effect and pan $80, and `frames` frames. `end X`
+// SFX: the same fresh CtAudio; set 0 is the field's effects (the set the driver's upload leaves resident), set 1 the
+// battle's (command $70 $01, C7/08E3, which uploads set B to $2F00), and any other set is refused; then command $18
+// (voices 7-6) with the effect and pan $80, and `frames` frames. `end X`
 // is where the effect's tracks are done ($86 = 0) and its voices are silent. Both commands go through the game's service
 // (CtAudioService, the mailbox at $1E00) as the game posts them.
 //
@@ -183,10 +184,10 @@ static int brrRender(const uint8_t* rom, long romLen, int instr, const char* out
   CtAudio* a = CtAudioInit(rom, romLen);
   int len = 0;
   const uint8_t* blk = a ? CtAudioSampleBlock(a, instr, &len) : NULL;
-  if (!blk || len <= 0 || len % 9) { printf("sndrender: brr %02X FAIL (no block)\n", instr); return 1; }
+  if (!blk || len <= 0 || len % 9) { printf("sndrender: brr %02X FAIL (no block)\n", instr); CtAudioFree(a); return 1; }
   static uint8_t aram[0x10000];
   const uint16_t at = 0x1000, dir = 0x0200;
-  if (at + len > 0x10000) { printf("sndrender: brr %02X FAIL (too long)\n", instr); return 1; }
+  if (at + len > 0x10000) { printf("sndrender: brr %02X FAIL (too long)\n", instr); CtAudioFree(a); return 1; }
   memset(aram, 0, sizeof aram);
   memcpy(aram + at, blk, (size_t)len);
   aram[dir] = at & 0xFF; aram[dir + 1] = at >> 8; aram[dir + 2] = at & 0xFF; aram[dir + 3] = at >> 8;
@@ -197,6 +198,7 @@ static int brrRender(const uint8_t* rom, long romLen, int instr, const char* out
   ct_mixer_voice_key_on(&mx, 0, 0, 0x1000, 0x00, 0x00, 0x7F);
   long want = (long)len / 9 * 16, got = 0;
   int16_t* pcm = (int16_t*)calloc((size_t)want * 2, sizeof *pcm);
+  if (!pcm) { fprintf(stderr, "sndrender: out of memory\n"); exit(3); }
   int16_t tmp[2];
   for (long guard = 0; got < want && guard < want * 8 + 64; guard++) {
     uint8_t pos = mx.v[0].ringPos;
@@ -213,6 +215,11 @@ static int brrRender(const uint8_t* rom, long romLen, int instr, const char* out
   return ok ? 0 : 1;
 }
 
+static void renderFree(Render* r) {
+  free(r->pcm); finderFree(&r->full); finderFree(&r->pos);
+  for (int k = 0; k < 8; k++) finderFree(&r->track[k]);
+}
+
 int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv) {
   if (argc >= 2 && !strcmp(argv[0], "brr")) return brrRender(rom, romLen, (int)strtol(argv[1], NULL, 16), argc >= 3 ? argv[2] : "-");
   int sfx = argc >= 1 && !strcmp(argv[0], "sfx");
@@ -222,6 +229,7 @@ int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv) {
     return 2;
   }
   int set = sfx ? (int)strtol(argv[1], NULL, 16) : 0;
+  if (set != 0 && set != 1) { printf("sndrender: sfx set %d FAIL (set 0 is the field's effects, 1 the battle's)\n", set); return 2; }
   int id = (int)strtol(argv[sfx ? 2 : 1], NULL, 16);
   long frames = strtol(argv[sfx ? 3 : 2], NULL, 0);
   const char* out = argv[sfx ? 4 : 3];
@@ -231,6 +239,7 @@ int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv) {
   SndMachine* m = a ? CtAudioMachine(a) : NULL;
   if (!a || !CtAudioReady(a) || !m) {
     printf("sndrender: FAIL (%s)\n", !a || !CtAudioReady(a) ? "the driver upload" : "needs CT_AUDIO_SPC=machine");
+    CtAudioFree(a);
     return 3;
   }
   CtAudioSetRuleOff(a, 1);
@@ -262,7 +271,7 @@ int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv) {
       rc = CtAudioService(a, wram);
     }
   }
-  if (rc != 1) { printf("sndrender: %s %02X FAIL (rc=%d)\n", sfx ? "sfx" : "song", id, rc); return 1; }
+  if (rc != 1) { printf("sndrender: %s %02X FAIL (rc=%d)\n", sfx ? "sfx" : "song", id, rc); renderFree(&r); CtAudioFree(a); return 1; }
   SndMachineSync(m);
   r.start = m->mixed;
   r.on = 1;
@@ -291,8 +300,7 @@ int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv) {
     printf("sndrender: song %02X mask %02X samples %ld peak %ld tempo %02X end %ld loop %ld %ld position %ld %ld tracks %s keyed %s fnv %08X\n",
            id, mask, r.n, peak, ram[0x47], r.endAt, r.full.loopS, r.full.loopE, r.pos.loopS, r.pos.loopE, tracks, keyed, h);
   }
-  free(r.pcm); finderFree(&r.full); finderFree(&r.pos);
-  for (int k = 0; k < 8; k++) finderFree(&r.track[k]);
+  renderFree(&r);
   CtAudioFree(a);
   return ok ? 0 : 1;
 }

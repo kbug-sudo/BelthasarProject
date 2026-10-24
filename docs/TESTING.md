@@ -13,7 +13,7 @@ python tools/regress.py --repin-failed          # re-pin the last run's failures
 python tools/regress.py --no-oracle-cache       # run every oracle for real (see "Speed")
 python tools/regress.py --clear-oracle-cache    # empty build/_oracle_cache
 python tools/regress.py --check-inputs          # presence + sha256 vs tools/regress_inputs.json
-python tools/regress.py --refresh-input-hashes  # rewrite sha256/size pins from disk
+python tools/regress.py --refresh-input-hashes  # re-pin from disk: sha256/size, used_by, provenance
 python tools/regress.py --mutate NAME           # prove NAME actually GRADES something
 python tools/regress.py --mutate-all            # every check that declares mutations
 
@@ -108,7 +108,10 @@ python tools/regress.py --check-inputs
 
 MISS lines print the `how` field from the manifest (ROM source, extract command,
 or RE capture recipe). After intentionally replacing a pinned file, re-hash with
-`--refresh-input-hashes` and commit the updated `regress_inputs.json`.
+`--refresh-input-hashes` and commit the updated `regress_inputs.json`. The refresh also rewrites each entry's
+`used_by` from the checks, records the provenance of the inputs a recipe or a public source makes
+(`tools/fixtures/`, `tools/third_party_saves.json`), labels git-tracked code and setup's generated files, and drops
+the entries no check reads any more.
 
 A check whose declared `inputs` are missing is reported as **SKIP with the missing
 file named** — it stays in the suite so the needed capture stays discoverable.
@@ -2675,3 +2678,15 @@ oracle from the shapes; a generator that gains a table without `python tools/gen
 platform while a developer's tree, which has the real files, never notices (5ebf30b's `ctMenuChromeExchTM`, PR #2). A
 FAIL is fixed by `python tools/gen/shapes.py make` and committing `tools/gen/shapes/`, never by re-pinning. It SKIPs in a
 tree with no generated files.
+
+### snd-render-* (`ct.exe --sndrender`, CT_AUDIO_SPC=machine)
+
+The offline renderer of the remaster's audio export (src/sound/render.c), on a fresh sound machine with no game logic:
+`snd-render-song-loop` (song $04's full mix: its loops, the samples it keys, the PCM's hash), `snd-render-song-stem` (the
+same song's voice 1 alone, the voice mask the export writes stems with), `snd-render-sfx-field` and
+`snd-render-sfx-battle` (effect $02 of the field's resident set and of the battle's, uploaded by command `$70 $01`: they
+sound differently), `snd-render-sfx-set-range` (any other set is refused, not rendered as the battle's) and
+`snd-render-brr-decode` (instrument $2C by the mixer's own BRR decoder). Each pins the summary line with an FNV-1a/32 of
+the PCM; their mutations hit the loop snapshot, the pan, the end test, the set upload, the voice mask and the BRR filter.
+Re-pin only for an intentional change to the sound machine that its own checks (snd-machine-*, mixer-*) validate. Nothing
+here changes how the game runs.
