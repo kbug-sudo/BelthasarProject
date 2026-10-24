@@ -16252,6 +16252,13 @@ int main(int argc, char** argv) {
     long rl = 0; const uint8_t* rom = CtRomImage(&rl);
     return CtSndSongs(rom, rl, (uint8_t)strtol(argv[2], NULL, 16), argc - 3, argv + 3);
   }
+  // --sndrender song <id> <frames> <out|-> [mask] / sfx <set> <id> <frames> <out|-> [mask] / brr <instr> [out|-] (with
+  // CT_AUDIO_SPC=machine): a song, an effect or a sample rendered offline from the ROM, no game logic (src/sound/render.c).
+  if (argc >= 4 && !strcmp(argv[1], "--sndrender")) {
+    extern int CtSndRender(const uint8_t* rom, long romLen, int argc, char** argv);
+    long rl = 0; const uint8_t* rom = CtRomImage(&rl);
+    return CtSndRender(rom, rl, argc - 2, argv + 2);
+  }
   if ((argc >= 3 && argc <= 5) && !strcmp(argv[1], "--hdmafuzz")) {
     long rl = 0; const uint8_t* rom = CtRomImage(&rl);
     long n = strtol(argv[2], NULL, 0);

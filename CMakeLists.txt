@@ -66,7 +66,7 @@ add_executable(ct
   src/wipe.c     # the window wipe C3/01E4 + C3/02DD and the overworld's window object, native (ct_vm.c; --wipeaudit)
   src/audio.c
   src/sound/driver.c src/sound/machine.c src/sound/coro.c src/sound/timing.c src/sound/timing_build.c   # the sound machine in C (CT_AUDIO_SPC)
-  src/sound/lockstep.c src/sound/fuzz.c   # ... against the vendored SPC700, instruction by instruction (CT_AUDIO_SPC=lockstep)
+  src/sound/lockstep.c src/sound/fuzz.c src/sound/render.c   # ... against the vendored SPC700, instruction by instruction (CT_AUDIO_SPC=lockstep)
   src/sound/mixer.c src/sound/mixer_dsp.c src/sound/mixer_replay.c   # --mixreplay: the native mixer against the vendored S-DSP
   src/field_cost.c   # ct_vm.c: the load's object pass, priced op by op (ct_vm_op_cycles)
   src/menu.c src/menu_cost.c   # --shadow: the inventory routines C2/8791 / C2/87D5 (ct_shadow.c)

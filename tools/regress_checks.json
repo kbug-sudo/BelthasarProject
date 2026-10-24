@@ -46307,6 +46307,80 @@
       ]
     },
     {
+      "name": "snd-render-song-loop",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "song",
+        "04",
+        "3300",
+        "-"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: song 04 mask FF samples 1762190 peak 10048 tempo 81 end -1 loop 43497 1579690 position 3423 1539742 tracks 3423:1539742,3423:1539742,3423:1539742,771666:835644,3423:1539742,-1:-1,-1:-1,-1:-1 keyed 20,21,22,23,24,25,26,27,28 fnv 970EE0DE"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 60,
+      "note_pass": "song $04 (Rhythm of Wind, Sky, and Earth) rendered offline from the ROM, no game logic: the game's loader on a fresh sound machine, 3300 frames of its S-DSP; the loop where the whole musical state first repeats (1.4 s -> 49.3 s), where the sequence first reaches its own loop target (0.1 s, the same period), each track's own loop (track 3 repeats a 2 s figure inside it), the samples it keys ($20 + its nine slots) and the PCM's hash",
+      "notes": "src/sound/render.c CtSndRender (ct.exe --sndrender), the renderer of the remaster's audio export (CC_Remaster_Project tools/ctaudio). The loop is the first recurrence of the sequencer's state at the main loop's top ($0299): every track's pointer, countdown, loop slot and that slot's pass count, passes left and return pointer, octave, instrument and transpose, the tempo and the tracks playing; `position` drops the octave, instrument and transpose; `tracks` keeps one track's pointer, countdown and loop slot. Nothing in it changes how the game runs. The old code has no --sndrender (the line never prints).",
+      "mutations": [
+        {
+          "file": "src/sound/render.c",
+          "find": "    s[k++] = ram[0xF200 + x]; s[k++] = ram[0xF201 + x]; s[k++] = ram[0xF361 + x];",
+          "replace": "    s[k++] = 0; s[k++] = 0; s[k++] = 0; /* MUT */",
+          "why": "without the octave, instrument and transpose the whole-state loop is the position loop: song $04's first pass from its loop target still carries the intro's settings"
+        },
+        {
+          "file": "src/sound/render.c",
+          "find": "    s[k++] = left ? ram[0xF560 + sp] : 0;             // the pass count (an infinite loop's counts for ever)\n    s[k++] = left;",
+          "replace": "    s[k++] = 0; s[k++] = 0; /* MUT */",
+          "why": "without the loop slot's pass count and passes left, two passes of an inner loop look like the song's loop (song $04: 4.0 s instead of 47.9 s)"
+        }
+      ]
+    },
+    {
+      "name": "snd-render-brr-decode",
+      "tier": "quick",
+      "argv": [
+        "build/ct.exe",
+        "--sndrender",
+        "brr",
+        "2C"
+      ],
+      "env": {
+        "CT_AUDIO_SPC": "machine"
+      },
+      "inputs": [
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "sndrender: brr 2C len 7461 samples 13264 fnv 72B5B36F"
+      ],
+      "pin": [
+        "^sndrender: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "instrument $2C's BRR block ($C9:BBF7, 7461 bytes) decoded by the mixer's own BRR decoder: 13264 samples, the hash the remaster's tools/ctaudio/brr.py gives too (its tests/test_ctaudio.py runs all 62 instruments against this mode)",
+      "notes": "src/sound/render.c brrRender: the block at a scratch address of a mixer's own sound RAM, a voice keyed on it at pitch $1000, each group of four samples taken from the voice's ring as src/sound/mixer.c brrDecode makes it, for the block's first pass. The old code has no --sndrender.",
+      "mutations": [
+        {
+          "file": "src/sound/mixer.c",
+          "find": "      case 1: s += old + (-old >> 4); break;",
+          "replace": "      case 1: s += old; break; /* MUT */",
+          "why": "BRR filter 1 without its -old/16 term"
+        }
+      ]
+    },
+    {
       "name": "gen-shapes-match-generated",
       "argv": [
         "python",
