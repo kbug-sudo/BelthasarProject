@@ -287,14 +287,15 @@ void CtPresentSetVsync(CtPresenter* p, int on) {
   else SDL_RenderSetVSync(p->ren, on ? 1 : 0);
 }
 
-int CtPresentSaveBMP(CtPresenter* p, const char* path) {
-  if (!p) return 0;
+// What was drawn since the last swap, as an ARGB8888 surface (the caller frees it); NULL = not read.
+static SDL_Surface* presentRead(CtPresenter* p) {
+  if (!p) return NULL;
 #ifdef CT_HAVE_VULKAN
-  if (p->backend == CT_BACKEND_VULKAN) return CtVkSaveBMP(p->vk, path);
+  if (p->backend == CT_BACKEND_VULKAN) return CtVkReadSurface(p->vk);
 #endif
   int ow, oh; CtPresentOutputSize(p, &ow, &oh);
   SDL_Surface* sf = SDL_CreateRGBSurfaceWithFormat(0, ow, oh, 32, SDL_PIXELFORMAT_ARGB8888);
-  if (!sf) return 0;
+  if (!sf) return NULL;
   int ok = 0;
   if (p->backend == CT_BACKEND_OPENGL) {
     uint8_t* tmp = (uint8_t*)malloc((size_t)ow * oh * 4);
@@ -308,7 +309,28 @@ int CtPresentSaveBMP(CtPresenter* p, const char* path) {
       free(tmp); ok = 1;
     }
   } else ok = SDL_RenderReadPixels(p->ren, NULL, SDL_PIXELFORMAT_ARGB8888, sf->pixels, sf->pitch) == 0;
-  if (ok) ok = SDL_SaveBMP(sf, path) == 0;
-  SDL_FreeSurface(sf);
+  if (!ok) { SDL_FreeSurface(sf); return NULL; }
+  return sf;
+}
+int CtPresentSaveBMP(CtPresenter* p, const char* path) {
+  SDL_Surface* sf = presentRead(p);
+  int ok = sf && SDL_SaveBMP(sf, path) == 0;
+  if (sf) SDL_FreeSurface(sf);
   return ok;
+}
+uint8_t* CtPresentReadRGB(CtPresenter* p, int* w, int* h) {
+  *w = *h = 0;
+  SDL_Surface* sf = presentRead(p);
+  if (!sf) return NULL;
+  uint8_t* o = (uint8_t*)malloc((size_t)sf->w * sf->h * 3);
+  if (o) {
+    for (int y = 0; y < sf->h; y++) {
+      const uint8_t* s = (const uint8_t*)sf->pixels + (size_t)y * sf->pitch;   // ARGB8888: memory B G R A
+      uint8_t* d = o + (size_t)y * sf->w * 3;
+      for (int x = 0; x < sf->w; x++, s += 4, d += 3) { d[0] = s[2]; d[1] = s[1]; d[2] = s[0]; }
+    }
+    *w = sf->w; *h = sf->h;
+  }
+  SDL_FreeSurface(sf);
+  return o;
 }

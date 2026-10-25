@@ -395,12 +395,12 @@ static int finish(CtVk* v, int readback) {
 }
 void CtVkSwap(CtVk* v) { if (v->recording) finish(v, 0); }
 
-int CtVkSaveBMP(CtVk* v, const char* path) {
-  if (!v->recording) return 0;
-  if (!finish(v, 1)) return 0;
+SDL_Surface* CtVkReadSurface(CtVk* v) {
+  if (!v->recording) return NULL;
+  if (!finish(v, 1)) return NULL;
   int w = (int)v->ext.width, h = (int)v->ext.height;
   SDL_Surface* sf = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
-  if (!sf) return 0;
+  if (!sf) return NULL;
   const uint8_t* s = (const uint8_t*)v->rbMap;
   for (int y = 0; y < h; y++) {
     uint8_t* d = (uint8_t*)sf->pixels + (size_t)y * sf->pitch;
@@ -408,8 +408,12 @@ int CtVkSaveBMP(CtVk* v, const char* path) {
       if (v->fmt == VK_FORMAT_B8G8R8A8_UNORM) { d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }
       else { d[0] = s[2]; d[1] = s[1]; d[2] = s[0]; }
       d[3] = 255; } }
-  int ok = SDL_SaveBMP(sf, path) == 0;
-  SDL_FreeSurface(sf);
+  return sf;
+}
+int CtVkSaveBMP(CtVk* v, const char* path) {
+  SDL_Surface* sf = CtVkReadSurface(v);
+  int ok = sf && SDL_SaveBMP(sf, path) == 0;
+  if (sf) SDL_FreeSurface(sf);
   return ok;
 }
 

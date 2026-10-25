@@ -39,10 +39,11 @@ static Ev* g_ev; static long g_nEv, g_capEv;
 static char g_kind[64] = "none";
 static uint8_t g_sram[BUG_SRAM]; static size_t g_sramN;
 static char g_approx[200];             // the first reason the session's replay is approximate ("" = exact)
+static int g_logLost;                  // a run the log could not keep (out of memory): its replay is unavailable
 
 void CtBugSessionStart(const char* kind, const uint8_t* sram, size_t sramN) {
   snprintf(g_kind, sizeof g_kind, "%s", kind && *kind ? kind : "none");
-  g_nRuns = 0; g_frames = 0; g_nEv = 0; g_approx[0] = 0;
+  g_nRuns = 0; g_frames = 0; g_nEv = 0; g_approx[0] = 0; g_logLost = 0;
   g_sramN = sram ? (sramN < BUG_SRAM ? sramN : BUG_SRAM) : 0;
   if (g_sramN) memcpy(g_sram, sram, g_sramN);
 }
@@ -56,7 +57,7 @@ void CtBugInputFrame(uint16_t level, uint16_t edges) {
     if (g_nRuns == g_capRuns) {
       long cap = g_capRuns ? g_capRuns * 2 : 4096;
       Run* r = (Run*)realloc(g_runs, (size_t)cap * sizeof *r);
-      if (!r) return;                                   // (out of memory: the log stops growing; the game goes on)
+      if (!r) { g_logLost = 1; g_frames++; return; }    // (out of memory: the log is no replay; the game goes on)
       g_runs = r; g_capRuns = cap;
     }
     g_runs[g_nRuns].n = 1; g_runs[g_nRuns].level = level; g_runs[g_nRuns].edges = edges; g_nRuns++;
@@ -133,7 +134,8 @@ int CtBugPlayOpen(const char* path, char* err, size_t errN) {
   char line[512]; long cap = 0, at = 0, endAt = -1; int head = 0;
   g_nPlay = 0;
   while (fgets(line, sizeof line, f)) {
-    if (!head) { if (strncmp(line, "ct-inputs 1", 11)) { snprintf(err, errN, "%s is not an inputs log", path); fclose(f); return 0; }
+    if (!head) { if (strncmp(line, "ct-inputs 1", 11) || (line[11] != '\n' && line[11] != '\r' && line[11] != 0)) {
+                   snprintf(err, errN, "%s is not an inputs log (version 1)", path); fclose(f); return 0; }
                  head = 1; continue; }
     if (line[0] == '#' || line[0] == '@' || line[0] == '\n' || line[0] == '\r' || !strncmp(line, "start ", 6)) continue;
     if (!strncmp(line, "end ", 4)) { endAt = atol(line + 4); break; }
@@ -172,20 +174,34 @@ static char* readAll(const char* path, size_t* n) {
   fclose(f);
   return p;
 }
-static const char* jsonField(const char* js, const char* key) {   // the text after `"key":` (a flat field of ours)
-  char k[80]; snprintf(k, sizeof k, "\"%s\":", key);
-  const char* q = strstr(js, k);
-  if (!q) return NULL;
-  q += strlen(k);
-  while (*q == ' ') q++;
-  return q;
+// The text after the member `"key":` of report.json's top-level object (not one inside a nested object or a string).
+static const char* jsonField(const char* js, const char* key) {
+  size_t kl = strlen(key);
+  int depth = 0;
+  for (const char* q = js; *q; q++) {
+    if (*q == '{' || *q == '[') depth++;
+    else if (*q == '}' || *q == ']') depth--;
+    else if (*q == '"') {
+      const char* s0 = q + 1;
+      for (q++; *q && *q != '"'; q++) if (*q == '\\' && q[1]) q++;
+      if (!*q) return NULL;
+      if (depth == 1 && (size_t)(q - s0) == kl && !strncmp(s0, key, kl)) {
+        const char* v = q + 1;
+        while (*v == ' ') v++;
+        if (*v == ':') { v++; while (*v == ' ' || *v == '\n' || *v == '\r') v++; return v; }
+      }
+    }
+  }
+  return NULL;
 }
 int CtBugCheckOpen(const char* dir, long* frame, char* err, size_t errN) {
   char p[1024]; size_t n = 0;
   snprintf(p, sizeof p, "%s/report.json", dir);
   char* js = readAll(p, NULL);
   if (!js) { snprintf(err, errN, "no %s", p); return 0; }
-  const char* fr = jsonField(js, "frame"), * nf = jsonField(js, "native_fnv"), * nb = jsonField(js, "report");
+  const char* fr = jsonField(js, "frame"), * hs = jsonField(js, "hashes"), * nb = jsonField(js, "report");
+  const char* nf = hs ? strstr(hs, "\"native_fnv\":") : NULL;     // (inside "hashes", the object the field opens)
+  if (nf) nf = strchr(nf + 13, '"');
   if (!fr || !nf) { snprintf(err, errN, "%s has no frame / native_fnv", p); free(js); return 0; }
   g_chkFrame = atol(fr); g_chkNative = (uint32_t)strtoul(nf + 1, NULL, 16); g_chkNumber = nb ? atoi(nb) : 0;
   free(js);
@@ -260,6 +276,10 @@ static int writeFile(const char* dir, const char* name, const void* p, size_t n)
 static void firstLine(const char* s, char* out, size_t n) {     // the note's first line, for the index
   size_t k = 0;
   for (; s && *s && *s != '\n' && *s != '\r' && k + 1 < n; s++) out[k++] = *s;
+  if (s && ((unsigned char)*s & 0xC0) == 0x80) {                // cut inside a UTF-8 character: drop its first bytes
+    while (k > 0 && ((unsigned char)out[k - 1] & 0xC0) == 0x80) k--;
+    if (k > 0) k--;
+  }
   out[k] = 0;
 }
 // META: CT_BUG_META="key=value key=value" from the launcher (the commits it ran from), as JSON members
@@ -311,7 +331,7 @@ int CtBugReportWrite(const CtBugFacts* f, char* outDir, size_t outN) {
   char exeSha[41] = "unknown";
   if (f->exePath) { size_t n = 0; char* ex = readAll(f->exePath, &n); if (ex) { CtSha1Hex((const uint8_t*)ex, (long)n, exeSha); free(ex); } }
   char srSha[41]; sramSha(srSha);
-  int replayable = !strcmp(g_kind, "boot");
+  int replayable = !strcmp(g_kind, "boot") && !g_logLost;
 
   char p[1024]; snprintf(p, sizeof p, "%s/report.json", dir);
   FILE* js = fopen(p, "wb");
@@ -333,7 +353,8 @@ int CtBugReportWrite(const CtBugFacts* f, char* outDir, size_t outN) {
   fprintf(js, ",\n  \"session\": {\"start\": "); jsonStr(js, g_kind);
   fprintf(js, ", \"frames\": %ld, \"sram_sha1\": \"%s\", \"replay\": ", g_frames, srSha);
   { char rp[300];
-    if (!replayable) snprintf(rp, sizeof rp, "unavailable: the session did not start at power-on (%s)", g_kind);
+    if (g_logLost) snprintf(rp, sizeof rp, "unavailable: the input log ran out of memory");
+    else if (!replayable) snprintf(rp, sizeof rp, "unavailable: the session did not start at power-on (%s)", g_kind);
     else if (g_approx[0]) snprintf(rp, sizeof rp, "approximate: %s", g_approx);
     else snprintf(rp, sizeof rp, "exact");
     jsonStr(js, rp); }
@@ -341,8 +362,12 @@ int CtBugReportWrite(const CtBugFacts* f, char* outDir, size_t outN) {
   fprintf(js, ",\n  \"build\": {\"exe\": "); jsonStr(js, f->exePath ? f->exePath : "");
   fprintf(js, ", \"exe_sha1\": \"%s\", \"meta\": ", exeSha); jsonMeta(js); fputc('}', js);
   fprintf(js, ",\n  \"hashes\": {\"wram_fnv\": \"%08X\", \"native_fnv\": \"%08X\"}", wf, nf);
-  fprintf(js, ",\n  \"files\": [\"report.json\", \"wram.bin\", \"screen.png\", \"screen_native.png\", \"inputs.log\"%s, \"console.txt\"]",
-          g_sramN ? ", \"sram.srm\"" : "");
+  fprintf(js, ",\n  \"files\": [\"report.json\"");   // what this writer wrote (the host adds scene.state + .apu in the field)
+  { static const char* const names[] = { "wram.bin", "screen.png", "screen_native.png", "inputs.log", "sram.srm", "console.txt" };
+    for (int i = 0; i < 6; i++) {
+      char fp[1100]; snprintf(fp, sizeof fp, "%s/%s", dir, names[i]);
+      FILE* t = fopen(fp, "rb"); if (t) { fclose(t); fprintf(js, ", \"%s\"", names[i]); } } }
+  fputc(']', js);
   fprintf(js, ",\n  \"status\": \"open\"\n}\n");
   ok &= fclose(js) == 0;
 

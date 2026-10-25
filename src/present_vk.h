@@ -21,6 +21,7 @@ void        CtVkDraw(CtVk* v, const SDL_Rect* dst, int linear);
 int         CtVkSetPicSize(CtVk* v, int w, int h);
 void        CtVkSwap(CtVk* v);
 int         CtVkSaveBMP(CtVk* v, const char* path);
+struct SDL_Surface* CtVkReadSurface(CtVk* v);   // the same frame as an ARGB8888 surface (the caller frees it); NULL = none
 int         CtVkInfoGet(CtVk* v, CtVkInfo* out);
 void*       CtVkCommandBuffer(CtVk* v);   // the frame being recorded (between Draw and Swap), else NULL
 void*       CtVkProc(CtVk* v, const char* name);   // vkGetInstanceProcAddr(instance, name)

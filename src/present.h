@@ -45,6 +45,7 @@ void          CtPresentSwap(CtPresenter* p);
 void          CtPresentSetVsync(CtPresenter* p, int on);
 void          CtPresentOutputSize(CtPresenter* p, int* w, int* h);    // the drawable, in pixels
 int           CtPresentSaveBMP(CtPresenter* p, const char* path);     // what was drawn since the last swap; 1 = saved
+uint8_t*      CtPresentReadRGB(CtPresenter* p, int* w, int* h);       // ...the same, RGB24 (malloc'd; NULL = not read)
 SDL_Renderer* CtPresentSdlRenderer(CtPresenter* p);       // CT_BACKEND_SDL: the renderer (the overlay's), else NULL
 void*         CtPresentGlContext(CtPresenter* p);         // CT_BACKEND_OPENGL: the context, else NULL
 struct CtVk*  CtPresentVk(CtPresenter* p);                // CT_BACKEND_VULKAN: the backend (present_vk.h), else NULL

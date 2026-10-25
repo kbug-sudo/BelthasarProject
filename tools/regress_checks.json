@@ -47467,7 +47467,8 @@
         "ct_assets.dat",
         "Chrono_Trigger_USA_SNES.sfc",
         "tools/bugreport.py",
-        "tools/bugreport/boot_to_bedroom.log"
+        "tools/bugreport/boot_to_bedroom.log",
+        "third_party/imgui/imgui.cpp"
       ],
       "expect": [
         "bugreport: saved 0001 frame 3200 loc 002 mode field category other",
@@ -47484,7 +47485,7 @@
       ],
       "timeout_s": 600,
       "note_pass": "the bug reporter's player side: `~` opens the panel over the paused game, a note typed into it is saved with the report, the DualSense's touchpad held a second takes one with no note, the window as drawn is the report's screen.png, the console is kept; every report replays exactly with every mod off -- the second after the panel's pause, the third from a session in 16:9 at 2x internal resolution",
-      "notes": "2026-10-25 (CC_Remaster_Project M6). tools/bugreport.py check-panel: the drive of bugreport-report-replays-on-both-sides under the interactive presentation without a window (CT_BUGKEYS with CT_NOPACE, the dummy video driver, the overlay's ImGui, CT_BUG_CONSOLE): at frame 3200 the events of `~` (SDL_SCANCODE_GRAVE and its typed character), the panel's text box filled by text events and Enter on its third frame (CT_BUGPANEL_TYPE); at frame 4000 the touchpad button's press, held: a report at its 60th frame (4059), note to add. A second session in widescreen 16:9 at 2x internal resolution (CT_SETTINGS) reports at 4500: its screen.png is the 796x448 window, its 256x224 picture the middle of the 398-wide frame. Each report replayed headless in the engine (CT_REPLAY_CHECK), where every mod is off: identical work RAM and picture is the presentation leaving the game alone (the render-independence check of PLAN Phase 8, in miniature). Not graded: the panel's SDL_FlushEvent (defensive: on Windows the character `~` types comes in the key's own batch of events, which the main loop takes) and the buttons kept from the game while the keys that closed the panel are still down (pushed events do not move SDL's keyboard state). Needs third_party/imgui. The old code has no reporter (no report line).",
+      "notes": "2026-10-25 (CC_Remaster_Project M6). tools/bugreport.py check-panel: the drive of bugreport-report-replays-on-both-sides under the interactive presentation without a window (CT_BUGKEYS with CT_NOPACE, the dummy video driver, the overlay's ImGui, CT_BUG_CONSOLE): at frame 3200 the events of `~` (SDL_SCANCODE_GRAVE and its typed character), the panel's text box filled by text events and Enter on its third frame (CT_BUGPANEL_TYPE); at frame 4000 the touchpad button's press, held: a report at its 60th frame (4059), note to add. A second session in widescreen 16:9 at 2x internal resolution (CT_SETTINGS) reports at 4500: its screen.png is the 796x448 window, its 256x224 picture the middle of the 398-wide frame. Each report replayed headless in the engine (CT_REPLAY_CHECK), where every mod is off: identical work RAM and picture is the presentation leaving the game alone (the render-independence check of PLAN Phase 8, in miniature). Not graded: the panel's SDL_FlushEvent (defensive: on Windows the character `~` types comes in the key's own batch of events, which the main loop takes). The buttons kept from the game while the key that closed the panel is down are graded by bugreport-live-pad-records-what-the-player-pressed. Needs third_party/imgui. The old code has no reporter (no report line).",
       "mutations": [
         {
           "file": "src/field.c",
@@ -47494,14 +47495,14 @@
         },
         {
           "file": "src/field.c",
-          "find": "  if (pr && g_hostInteractive) {\n    const char* tmp = \"ct_bugreport_screen.bmp\";",
-          "replace": "  if (0) { /* MUT */\n    const char* tmp = \"ct_bugreport_screen.bmp\";",
+          "find": "    uint8_t* o = CtPresentReadRGB(pr, w, h);",
+          "replace": "    uint8_t* o = NULL; /* MUT */",
           "why": "screen.png is the uploaded 256x224 picture, not the window the player saw"
         },
         {
           "file": "src/field.c",
-          "find": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE) { bugReq = 1; continue; }",
-          "replace": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE) { continue; } /* MUT */",
+          "find": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE && !fieldKeyPadOf(SDL_SCANCODE_GRAVE)) { bugReq = 1; continue; }",
+          "replace": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE && !fieldKeyPadOf(SDL_SCANCODE_GRAVE)) { continue; } /* MUT */",
           "why": "`~` opens nothing: one report, not two"
         },
         {
@@ -47512,8 +47513,8 @@
         },
         {
           "file": "src/bugreport_console.c",
-          "find": "    ringAppend(buf, (size_t)n);",
-          "replace": "    /* MUT: nothing kept */",
+          "find": "      if (buf[i] == '\\n' || ln == sizeof line) { ringAppend(line, ln); ln = 0; }",
+          "replace": "      if (buf[i] == '\\n' || ln == sizeof line) { ln = 0; } /* MUT: nothing kept */",
           "why": "the console's lines go on to the console but not into the ring: console.txt is empty"
         },
         {
@@ -47521,6 +47522,61 @@
           "find": "  int x0 = (g_lastShownW - CAMW) / 2;",
           "replace": "  int x0 = 0; /* MUT */",
           "why": "the 256x224 picture of a widescreen frame is its left edge, not its middle: the 16:9 report's picture is not the replay's"
+        }
+      ]
+    },
+    {
+      "name": "bugreport-live-pad-records-what-the-player-pressed",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/bugreport.py",
+        "check-pad"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/bugreport.py",
+        "tools/bugreport/boot_to_bedroom.log",
+        "third_party/imgui/imgui.cpp"
+      ],
+      "expect": [
+        "bugreport-pad: a virtual controller, a game controller, bugreport probe",
+        "bugreport: saved 0001 frame 4700 loc 002 mode field category picture",
+        "bugreport-check: pad report 0001 frame 4700: log 4700 frames, 0 differ from the drive; wram fnv 34915603, native fnv 50C57E0E; report 0001 frame 4700: wram 131072/131072 identical, picture identical (fnv 50C57E0E)",
+        "bugreport: saved 0001 frame 3200 loc 002 mode field category other",
+        "bugreport: saved 0002 frame 4000 loc 002 mode field category other",
+        "bugreport-check: held Start on the game's side at frames 3195-3199; the rest of the level is the drive's",
+        "bugreport-check: held report 0001 frame 3200 note \"Start held over the panel\", report 0001 frame 3200: wram 131072/131072 identical, picture identical (fnv F5E6300B)",
+        "bugreport-check: held report 0002 frame 4000 note \"after the panel\", report 0002 frame 4000: wram 131072/131072 identical, picture identical (fnv AA6BEB5D)"
+      ],
+      "pin": [
+        "^bugreport-pad: ",
+        "^bugreport: saved",
+        "^bugreport-check: "
+      ],
+      "timeout_s": 600,
+      "note_pass": "the bug reporter records a player's own input: a session played on a (virtual) controller -- SDL's controller state and its button events, not a replayed log -- records exactly the drive it was played from and reaches the same game (the work RAM and picture of bugreport-report-replays-on-both-sides); a button held as the panel closes is kept from the game until it is let go; every report replays exactly",
+      "notes": "2026-10-25 (CC_Remaster_Project M6; the fresh-context review's finding that no check ran the live recording path). tools/bugreport.py check-pad: CT_BUGPAD attaches a virtual game controller (SDL_JoystickAttachVirtualEx, every button valid) whose buttons follow tools/bugreport/boot_to_bedroom.log's level each frame through the default pad bindings, under the interactive presentation without a window (CT_NOPACE; SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, the window being hidden). No CT_PLAYINPUT: the host's fieldKeyPadLive and its controller-button edges make the log. Session 1 reports at 4700: its inputs.log equals the drive (levels and edges, 4700 frames) and its work RAM and picture hashes are the drive-played session's (34915603, 50C57E0E). Session 2 holds Start (CT_BUGPAD_HOLD 8@3195:15) across a `~` panel at 3200: the log shows Start at 3195-3199 and not 3200-3209 (field.c g_bugHeldMask), the rest the drive's. Each report replayed (CT_REPLAY_CHECK). Needs third_party/imgui (the panel). The old code has no reporter.",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "(upPressed ? CT_BUG_EDGE_UP : 0) | (downPressed ? CT_BUG_EDGE_DOWN : 0)",
+          "replace": "(upPressed ? CT_BUG_EDGE_DOWN : 0) | (downPressed ? CT_BUG_EDGE_UP : 0) /* MUT */",
+          "why": "the live recording swaps the d-pad's up and down presses: a player's log is not what the player pressed"
+        },
+        {
+          "file": "src/field.c",
+          "find": "    g_bugHeldMask = fieldKeyPadLive();               // (the keys that closed it, still down)",
+          "replace": "    g_bugHeldMask = 0; /* MUT */",
+          "why": "the key that closed the panel reaches the game: Start held on the game's side through 3209"
+        },
+        {
+          "file": "src/field.c",
+          "find": "        g_hostLevel = (uint16_t)(live & ~g_bugHeldMask);",
+          "replace": "        g_hostLevel = (uint16_t)(live & ~g_bugHeldMask & ~0x100); /* MUT */",
+          "why": "the live level loses A: the log is not the drive and the game is another"
         }
       ]
     }

@@ -226,6 +226,7 @@
         "boot-natural-load-a-save",
         "boot-natural-new-game-row",
         "boot-title-opening-no-false-start-vs-rule-cartridge",
+        "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides",
         "collision-actor-block",
@@ -1123,6 +1124,7 @@
         "boot-natural-load-a-save",
         "boot-natural-new-game-row",
         "boot-title-opening-no-false-start-vs-rule-cartridge",
+        "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides",
         "camera-reenter-scene5",
@@ -5312,8 +5314,8 @@
         "boot-title-opening-no-false-start-vs-rule-cartridge",
         "ow-ferry-both-ways-vs-rule-cartridge"
       ],
-      "sha256": "b8da8e241ef151204e7dd60fbd67e0c817eadda52631cbfc990963def8b5eb9c",
-      "size": 1696994,
+      "sha256": "dd5a23da706c5aed2710f2deaa69d675ea0fc3496dba78fa57997ca0c859e688",
+      "size": 1699645,
       "present_when_recorded": true
     },
     {
@@ -5392,6 +5394,19 @@
       ],
       "sha256": "17b1956d6435b2835b04d77486def1875e37f211943051e7141c9e2c3313636d",
       "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "third_party/imgui/imgui.cpp",
+      "kind": "third-party",
+      "regenerable": true,
+      "how": "powershell tools/get_imgui.ps1 (Dear ImGui 1.91.5; git-ignored)",
+      "used_by": [
+        "bugreport-live-pad-records-what-the-player-pressed",
+        "bugreport-panel-takes-a-report"
+      ],
+      "sha256": "e5b050610d65eaf22a3a5b1ff788b8fa99bf9e722f0c3f4fb0f900c2599e72bd",
+      "size": 863079,
       "present_when_recorded": true
     },
     {
@@ -5704,23 +5719,25 @@
     },
     {
       "path": "tools/bugreport.py",
-      "kind": "unknown",
+      "kind": "tool",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: the file at the checked-out commit.",
       "used_by": [
+        "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides"
       ],
-      "sha256": "5e0fa0626a708c81eecb0cc22dc70250c4b49af3868325a62384dc9af42da423",
-      "size": 23386,
+      "sha256": "5eb595b5d1e90e9160b0df71997d83d5002e36476449882fcec80372c0f91950",
+      "size": 33847,
       "present_when_recorded": true
     },
     {
       "path": "tools/bugreport/boot_to_bedroom.log",
-      "kind": "unknown",
+      "kind": "drive",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: tools/playthrough/route.txt legs 00-02 as the engine's input (one frame later, each press's edge on the frame its bit rises); the file at the checked-out commit.",
       "used_by": [
+        "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides"
       ],

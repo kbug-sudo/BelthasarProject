@@ -18,7 +18,10 @@ THE REPLAY of a session that started at power-on (`--boot`):
     cartridge's + 1 (tools/playthrough.py). Graded as playthrough.py grades its legs: the chains of the location, the
     storyline, the party, gold, Crono's HP and the player's control, in order, from each side's first lit frame (the
     power-on's black stretch is the cold init's, where the two seed the party 22 frames apart and nothing shows), and the
-    cartridge's last picture against the engine's within 6 frames either side.
+    cartridge's last picture against the engine's within 6 frames either side -- or either side of where the engine stood
+    when the two have drifted apart. Both sides play EXT idle frames past the report: the engine's loads skip the
+    cartridge's black frames, so at the report the two can stand dozens of frames apart, and a value one side reached
+    just before the report is no split when the other reaches it just after (it is printed as "past the window").
 The verdict: the engine does not reproduce its own report (not deterministic, or an approximate session: free sync, F8,
 F9, a scripted drive); a PORT bug candidate (the chains part: the first value that differs, its frames on both sides);
 the picture alone differs (a port picture bug); or both agree (the original game's behaviour -- or, when screen.png is not
@@ -55,6 +58,7 @@ MON = [('loc', '7E0100', '0100', 2), ('story', '7F0000', '10000', 1), ('party', 
        ('gold', '7E2C53', '2C53', 3), ('hp', '7E2603', '2603', 2), ('ctrl', '7E011F', '011F', 1), ('bri', '7E0119', '0119', 1)]
 GRADED = [k for k, _, _, _ in MON if k != 'bri']
 SHOTS = range(-6, 7)
+EXT = 300                       # idle frames both sides play past the report: a value one reached a little later
 
 
 def fnv(b):
@@ -161,15 +165,30 @@ def run(cmd, env, timeout=7200):
     return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, errors='replace', timeout=timeout)
 
 
-def engine_env(tmp, sram, log):
-    """A headless engine replaying `log` from `sram` (copied: a save in the replay writes the copy)."""
-    srm = os.path.join(tmp, 'replay.srm')
+def start(cmd, env):
+    """A run in the background (the replay's four runs go side by side): finish() collects it."""
+    return subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            errors='replace')
+
+
+def finish(p, timeout=7200):
+    out, err = p.communicate(timeout=timeout)
+    return subprocess.CompletedProcess(p.args, p.returncode, out, err)
+
+
+def engine_env(tmp, sram, log, name='replay'):
+    """A headless engine from `sram` (a copy of its own: a save in the run writes the copy), replaying `log` when one is
+    given (CT_PLAYINPUT)."""
+    srm = os.path.join(tmp, name + '.srm')
     if os.path.exists(sram):
         shutil.copyfile(sram, srm)
     elif os.path.exists(srm):
         os.remove(srm)
-    return dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy', CT_NOPACE='1', CT_AUDIO_LOCKSTEP='1',
-                CT_SRAM=srm, CT_PLAYINPUT=log, CT_BUG_DIR=os.path.join(tmp, 'replay_bugs'))
+    env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy', CT_NOPACE='1', CT_AUDIO_LOCKSTEP='1',
+               CT_SRAM=srm, CT_BUG_DIR=os.path.join(tmp, name + '_bugs'))
+    if log:
+        env['CT_PLAYINPUT'] = log
+    return env
 
 
 def memmon(stdout):
@@ -183,40 +202,72 @@ def memmon(stdout):
     return tl
 
 
-def engine_check(d, tmp):
-    """The engine's replay graded at the report (its `bugreport-replay:` line, or None) and its timeline."""
-    env = engine_env(tmp, os.path.join(d, 'sram.srm'), os.path.join(d, 'inputs.log'))
+def engine_check_start(d, tmp, name='replay'):
+    """The engine's replay graded at the report, with its timeline (engine_check_finish reads them)."""
+    env = engine_env(tmp, os.path.join(d, 'sram.srm'), os.path.join(d, 'inputs.log'), name)
     env.update(CT_REPLAY_CHECK=d, CT_FIELD_MEMMON=','.join('%s:%d' % (p, n) for _, _, p, n in MON))
-    r = run([FIELD, '--assets', 'ct_assets.dat', '--boot'], env)
+    return start([FIELD, '--assets', 'ct_assets.dat', '--boot'], env)
+
+
+def engine_check_finish(p):
+    """(its `bugreport-replay:` line or None, its timeline, the run)."""
+    r = finish(p)
     line = next((l for l in r.stdout.splitlines() if l.startswith('bugreport-replay:')), None)
     return line, memmon(r.stdout), r
 
 
-def engine_pictures(d, tmp, frames):
-    """The engine's 256x224 pictures a few frames either side of the report's ({offset: RGB})."""
-    env = engine_env(tmp, os.path.join(d, 'sram.srm'), os.path.join(d, 'inputs.log'))
-    at = [frames + k for k in SHOTS if frames + k > 0]
-    env.update(CT_SHOTS=os.path.join(tmp, 'p'), CT_SHOTS_AT=','.join(map(str, at)), CT_SHOTS_EXIT='1')
-    run([FIELD, '--assets', 'ct_assets.dat', '--boot'], env)
+def engine_check(d, tmp, name='replay'):
+    return engine_check_finish(engine_check_start(d, tmp, name))
+
+
+def engine_pictures_start(d, tmp, host_frame, center=0, timeline=True):
+    """The engine's 256x224 pictures a few frames either side of the report's frame (+ `center`), and with `timeline` its
+    graded bytes on to EXT idle frames past the report (the log over, no input: the player had stopped to report).
+    CT_SHOTS numbers the host's frames (frameNo), which is what report.json's host_frame records."""
+    env = engine_env(tmp, os.path.join(d, 'sram.srm'), os.path.join(d, 'inputs.log'), 'pictures%+d' % center)
+    at = [host_frame + center + k for k in SHOTS if host_frame + center + k > 0]
+    end = at + ([host_frame + EXT] if timeline else [])
+    env.update(CT_SHOTS=os.path.join(tmp, 'p%+d' % center), CT_SHOTS_AT=','.join(map(str, end)), CT_SHOTS_EXIT='1')
+    if timeline:
+        env['CT_FIELD_MEMMON'] = ','.join('%s:%d' % (p, n) for _, _, p, n in MON)
+    return start([FIELD, '--assets', 'ct_assets.dat', '--boot'], env), at, end, center
+
+
+def engine_pictures_finish(job, tmp, host_frame):
+    """({offset from the report's frame: RGB}, the timeline) of a run engine_pictures_start began."""
+    p, at, end, center = job
+    r = finish(p)
     pics = {}
-    for f in at:
-        fn = os.path.join(tmp, 'p_f%d.raw' % f)
+    for f in end:
+        fn = os.path.join(tmp, 'p%+d_f%d.raw' % (center, f))
         if os.path.exists(fn):
-            b = open(fn, 'rb').read()
-            pw = struct.unpack('<I', b[:4])[0]
-            x0 = (pw - 256) // 2 * 3
-            pics[f - frames] = b''.join(b[8 + y * pw * 3 + x0:8 + y * pw * 3 + x0 + 768] for y in range(224))
+            if f in at:
+                b = open(fn, 'rb').read()
+                pw = struct.unpack('<I', b[:4])[0]
+                x0 = (pw - 256) // 2 * 3
+                pics[f - host_frame] = b''.join(b[8 + y * pw * 3 + x0:8 + y * pw * 3 + x0 + 768] for y in range(224))
             os.remove(fn)
-    return pics
+    return pics, memmon(r.stdout)
 
 
-def cartridge(d, tmp, pad, frames):
-    """The cartridge from power-on with the report's battery: its timeline and its last picture (256x224 RGB)."""
+def cartridge_start(d, tmp, pad, frames):
+    """The cartridge from power-on with the report's battery: its timeline (on to EXT idle frames past the window) and
+    its picture at the window's end, two runs side by side."""
     env = dict(os.environ, CT_ORACLE_LOGICAL='1')
     if os.path.exists(os.path.join(d, 'sram.srm')):
         env['CT_ORACLE_SRAM'] = os.path.join(d, 'sram.srm')
-    r = run([CT, '--monitor', ','.join('%s:%d' % (a, n) for _, a, _, n in MON), '--from', 'boot', '--input',
-             btnscript(pad) or '0:0', '--frames', str(frames), '--diff'], env)
+    raw = os.path.join(tmp, 'cart.raw')
+    ext = list(pad) + [(0, EXT)]
+    mon = start([CT, '--monitor', ','.join('%s:%d' % (a, n) for _, a, _, n in MON), '--from', 'boot', '--input',
+                 btnscript(ext), '--frames', str(frames + EXT), '--diff'], env)
+    peek = start([CT, '--peek', 'boot', raw, '--frames', str(frames), '--btnscript', btnscript(pad) or '0:0'], env)
+    return mon, peek, raw, frames + EXT
+
+
+def cartridge_finish(job):
+    """(its timeline, its last picture as 256x224 RGB or None, why it is unavailable or None)."""
+    mon, peek, raw, frames = job
+    r, rp = finish(mon), finish(peek)
     tl = []
     for line in r.stdout.splitlines():
         m = re.match(r'\s*f(\d+)\s+(.*)', line)
@@ -225,10 +276,11 @@ def cartridge(d, tmp, pad, frames):
         kv = dict(re.findall(r'\b([0-9A-F]{6})=([0-9A-F]+)', m.group(2)))
         if all(a in kv for _, a, _, _ in MON):
             tl.append((int(m.group(1)), {k: kv[a] for k, a, _, _ in MON}))
-    raw = os.path.join(tmp, 'cart.raw')
-    run([CT, '--peek', 'boot', raw, '--frames', str(frames), '--btnscript', btnscript(pad) or '0:0'], env)
+    why = None
+    if r.returncode != 0 or not tl:
+        why = 'ct.exe --monitor exited %d with %d samples: %s' % (r.returncode, len(tl), (r.stdout + r.stderr)[-300:].strip())
     pic = None
-    if os.path.exists(raw):
+    if rp.returncode == 0 and os.path.exists(raw):
         o = open(raw, 'rb').read()
         px = bytearray()
         for y in range(224):
@@ -237,7 +289,9 @@ def cartridge(d, tmp, pad, frames):
                 i = (rr + x * 2) * 4
                 px += bytes((o[i + 3], o[i + 2], o[i + 1]))
         pic = bytes(px)
-    return tl, pic
+    elif not why:
+        why = 'ct.exe --peek exited %d: %s' % (rp.returncode, (rp.stdout + rp.stderr)[-300:].strip())
+    return tl, pic, why
 
 
 def picture_grade(c, pics):
@@ -250,18 +304,33 @@ def picture_grade(c, pics):
     return best or (None, -1)
 
 
-def first_split(o, p):
-    """The earliest value (by the cartridge's frame) where the two chains part: (key, index) or None."""
-    first = None
+def compare(o, p, cend, eend):
+    """The two sides' chains compared over their windows (the cartridge's to `cend`, the engine's to `eend`), each side
+    allowed its idle frames past the window to reach a value the other reached inside its own: the engine's loads skip
+    the cartridge's black frames, so at the report the two can stand dozens of frames apart, and a value one side reached
+    just before the report is not a split when the other reaches it just after. Returns (the split as (key, index) or
+    None, the values reached only past a window as (key, value, side, frame), the matched values' (cartridge frame,
+    engine frame - cartridge frame) inside both windows)."""
+    split, pend, offs = None, [], []
     for key in GRADED:
-        ov, pv = [v for _, v in o[key]], [v for _, v in p[key]]
-        for i in range(max(len(ov), len(pv))):
-            if i >= len(ov) or i >= len(pv) or ov[i] != pv[i]:
-                f = o[key][i][0] if i < len(ov) else p[key][i][0]
-                if first is None or f < first[0]:
-                    first = (f, key, i)
+        n = max(sum(1 for f, _ in o[key] if f <= cend), sum(1 for f, _ in p[key] if f <= eend))
+        for i in range(n):
+            ov = o[key][i] if i < len(o[key]) else None
+            pv = p[key][i] if i < len(p[key]) else None
+            if ov is None or pv is None or ov[1] != pv[1]:
+                f = (ov or pv)[0]
+                if split is None or f < split[0]:
+                    split = (f, key, i)
                 break
-    return first and first[1:]
+            if ov[0] > cend:
+                pend.append((key, ov[1], 'cartridge', ov[0]))
+            elif pv[0] > eend:
+                pend.append((key, pv[1], 'engine', pv[0]))
+            else:
+                offs.append((ov[0], pv[0] - ov[0]))
+    if split:                                    # (only what both sides agreed on before the split measures the drift)
+        offs = [x for x in offs if x[0] < split[0]]
+    return (split[1:] if split else None), pend, offs
 
 
 def replay(d, verbose=False, keep=False):
@@ -281,37 +350,71 @@ def replay(d, verbose=False, keep=False):
     print('replay: report %04d, %d frames from power-on; the session\'s replay is %s' % (num, frames, rep['session']['replay']))
     for e in ev:
         print('  event %s' % e)
-    unseen = sum(1 for k in range(1, len(lv)) if (ed[k] & 1) and not (lv[k] & 0x100 and not lv[k - 1] & 0x100))
+    # presses the controller word does not show (two keys on one button, a press and release inside one frame): the
+    # engine's frames where the host made an A press with no A rising in the word -- the cartridge never sees them
+    unseen = [k for k in range(1, len(lv)) if (ed[k] & 1) and not (lv[k] & 0x100 and not lv[k - 1] & 0x100)]
     tmp = tempfile.mkdtemp(prefix='ct_bugreplay_')
     try:
-        line, etl, er = engine_check(d, tmp)
+        hf = rep.get('host_frame', frames)
+        cend = frames - 1                                          # the cartridge's frame k = the engine's k + 1
+        jobs = (engine_check_start(d, tmp), engine_pictures_start(d, tmp, hf), cartridge_start(d, tmp, pad_of(lv[1:]), cend))
+        line, _, er = engine_check_finish(jobs[0])
+        pics, etl = engine_pictures_finish(jobs[1], tmp, hf)
+        ctl, cpic, why = cartridge_finish(jobs[2])
         res['engine'] = bool(line) and ' wram 131072/131072 identical' in line and 'picture identical' in line
         print(line or 'bugreport-replay: no line (exit %d): %s' % (er.returncode, (er.stdout + er.stderr)[-400:]))
-        pics = engine_pictures(d, tmp, frames)
-        ctl, cpic = cartridge(d, tmp, pad_of(lv[1:]), frames - 1)     # the cartridge's frame k = the engine's k + 1
+        if why:
+            res['cartridge'] = None
+            print('bugreport-cartridge: UNAVAILABLE -- %s' % why)
+            res['verdict'] = ('%s; the cartridge could not be played (%s): no verdict on the port' % (
+                'the engine reproduces its report' if res['engine'] else 'the engine does NOT reproduce its own report', why))
+            print('verdict: %s' % res['verdict'])
+            return res
         o, p = chains(ctl), chains(etl)
-        same = all([v for _, v in o[k]] == [v for _, v in p[k]] for k in GRADED)
-        k, npx = picture_grade(cpic, pics) if cpic and pics else (None, -1)
-        res['cartridge'] = same and npx == 0
+        split, pend, offs = compare(o, p, cend, hf)
+        last = max(offs)[1] if offs else 0                         # the sides' offset at the latest value they share
+        drift = max([abs(x[1]) for x in offs] or [0])
+        k, npx = picture_grade(cpic, pics) if pics else (None, None)    # (None: the engine took no picture there)
+        if npx and abs(last) > 6:                                  # the pictures where the engine stood at the report
+            more, _ = engine_pictures_finish(engine_pictures_start(d, tmp, hf, last, False), tmp, hf)
+            k2, n2 = picture_grade(cpic, more) if more else (None, None)
+            if n2 is not None and n2 < npx:
+                k, npx = k2, n2
+        res['cartridge'] = split is None and npx == 0
+        ow = {kk: [v for f, v in o[kk] if f <= cend] for kk in GRADED}
         print('bugreport-cartridge: %s -- locs %s | story %s | party %s | end picture %s' % (
-            'SAME' if res['cartridge'] else 'DIFFERENT', ' '.join(v for _, v in o['loc']), ' '.join(v for _, v in o['story']),
-            ' '.join(v for _, v in o['party']), '%d px at engine %+d' % (npx, k) if k is not None else 'none'))
-        if not same or verbose:
+            'SAME' if res['cartridge'] else 'DIFFERENT', ' '.join(ow['loc']), ' '.join(ow['story']), ' '.join(ow['party']),
+            '%d px at engine %+d' % (npx, k) if k is not None else 'none'))
+        for key, v, side, f in pend:
+            print('  past the window: %s %s reached by the %s only in its idle frames (frame %d; the two sides %+d frames '
+                  'apart at their last shared value)' % (key, v, side, f, last))
+        if split or verbose:
             for key in GRADED:
-                print('  %-5s cartridge %s' % (key, ' '.join('%s@%d' % (v, f) for f, v in o[key])))
-                print('  %-5s engine    %s' % (key, ' '.join('%s@%d' % (v, f) for f, v in p[key])))
+                print('  %-5s cartridge %s' % (key, ' '.join('%s@%d' % (v, f) for f, v in o[key] if f <= cend + EXT)))
+                print('  %-5s engine    %s' % (key, ' '.join('%s@%d' % (v, f) for f, v in p[key] if f <= hf + EXT)))
         if unseen:
             print('  note: %d frame(s) carry an A press the controller word does not show (two keys on one button, or a '
-                  'press and release inside one frame): the cartridge cannot see those' % unseen)
+                  'press and release inside one frame): the cartridge cannot see those (the first at frame %d)' % (
+                      len(unseen), unseen[0]))
         if not res['engine']:
             res['verdict'] = ('the engine does NOT reproduce its own report: not deterministic here, or the session\'s replay '
                               'is approximate (%s)' % rep['session']['replay'])
-        elif not same:
-            key, i = first_split(o, p)
+        elif split:
+            key, i = split
             ov = '%s@%d' % (o[key][i][1], o[key][i][0]) if i < len(o[key]) else 'none'
             pv = '%s@%d' % (p[key][i][1], p[key][i][0]) if i < len(p[key]) else 'none'
+            at = o[key][i][0] if i < len(o[key]) else p[key][i][0]
             res['verdict'] = ('a PORT bug candidate: the engine parts from the cartridge at %s value %d -- cartridge %s, '
                               'engine %s (start the hunt there: the triage-regression playbook)' % (key, i, ov, pv))
+            if drift > 3:
+                res['verdict'] += ('; but the two sides were already up to %d frames apart before it, and an input timed '
+                                   'on the engine can meet another moment on the cartridge there (timing drift): a lead, '
+                                   'not a verdict' % drift)
+            if unseen and unseen[0] - 1 <= at:
+                res['verdict'] += ('; and %d A press(es) the cartridge never saw came before it (the first at frame %d): '
+                                   'one of them may be the split' % (sum(1 for u in unseen if u - 1 <= at), unseen[0]))
+        elif npx is None:
+            res['verdict'] = "the state agrees with the cartridge; the engine took no picture around the report's frame"
         elif npx != 0:
             res['verdict'] = ('the state agrees with the cartridge, the 256x224 picture does not (%d px at its closest, %+d '
                               'frames): a port picture bug' % (npx, k if k is not None else 0))
@@ -427,6 +530,67 @@ def check_panel():
     return 0
 
 
+def pad_session(tmp, name, extra, reports):
+    """A session played the way a player plays: the drive's level on a virtual controller (CT_BUGPAD: SDL's controller
+    state and its button events), no CT_PLAYINPUT -- so the log is what the host records from the pad."""
+    bugs = os.path.join(tmp, name)
+    env = engine_env(tmp, os.path.join(tmp, 'none.srm'), None, name)
+    env.update(CT_BUG_DIR=bugs, CT_SETTINGS=os.path.join(tmp, 'none.ini'), CT_BUGPAD=DRIVE, CT_BUGREPORT_EXIT=str(reports))
+    env.update(extra)
+    try:
+        r = run([FIELD, '--assets', 'ct_assets.dat', '--boot'], env, timeout=240)
+        out = r.stdout
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode('utf-8', 'replace') if isinstance(e.stdout, bytes) else (e.stdout or '')
+        print('bugreport-check: %s ran out of time (240 s)' % name)
+    for l in out.splitlines():
+        if l.startswith('bugreport: saved') or l.startswith('bugreport-pad:'):
+            print(l)
+    return report_dirs(bugs)
+
+
+def check_pad():
+    tmp = tempfile.mkdtemp(prefix='ct_bugpad_')
+    try:
+        _, dlv, ded, _ = read_log(DRIVE)
+        # the drive on the pad: the host's own recording must be the drive itself, and the game the drive's game
+        ds = pad_session(tmp, 'pad', {'CT_BUGREPORT_AT': '4700:picture:the pad\'s report'}, 1)
+        if len(ds) != 1:
+            print('bugreport-check: FAIL the pad session wrote %d report(s)' % len(ds))
+            return 1
+        rep = json.load(open(os.path.join(ds[0], 'report.json'), encoding='utf-8'))
+        _, lv, ed, _ = read_log(os.path.join(ds[0], 'inputs.log'))
+        bad = [k for k in range(len(lv)) if lv[k] != dlv[k] or ed[k] != ded[k]]
+        line, _, _ = engine_check(ds[0], tmp)
+        print('bugreport-check: pad report %04d frame %d: log %d frames, %d differ from the drive%s; wram fnv %s, native '
+              'fnv %s; %s' % (rep['report'], rep['frame'], len(lv), len(bad),
+                              ' (the first at %d: level %03X edges %03X, the drive %03X %03X)' % (
+                                  bad[0], lv[bad[0]], ed[bad[0]], dlv[bad[0]], ded[bad[0]]) if bad else '',
+                              rep['hashes']['wram_fnv'], rep['hashes']['native_fnv'],
+                              line[len('bugreport-replay: '):] if line else 'no replay line'))
+        # Start held on the pad from 3195 to 3209 across the panel (`~` at 3200): from the panel's close the button is
+        # kept from the game until it is let go -- the key that closed a panel never reaches the game
+        ds = pad_session(tmp, 'held', {'CT_BUGPAD_HOLD': '8@3195:15', 'CT_BUGKEYS': '3200:grave',
+                                       'CT_BUGPANEL_TYPE': 'Start held over the panel',
+                                       'CT_BUGREPORT_AT': '4000:other:after the panel'}, 2)
+        if len(ds) != 2:
+            print('bugreport-check: FAIL the held session wrote %d report(s)' % len(ds))
+            return 1
+        _, lv, ed, _ = read_log(os.path.join(ds[1], 'inputs.log'))
+        start_on = [k for k in range(len(lv)) if (lv[k] & 8) and not (dlv[k] & 8)]
+        rest = [k for k in range(len(lv)) if (lv[k] & ~8) != (dlv[k] & ~8)]
+        print('bugreport-check: held Start on the game\'s side at frames %s; the rest of the level %s the drive\'s' % (
+            '%d-%d' % (start_on[0], start_on[-1]) if start_on else 'none', 'is' if not rest else 'is NOT (%d frames)' % len(rest)))
+        for d in ds:
+            rep = json.load(open(os.path.join(d, 'report.json'), encoding='utf-8'))
+            line, _, _ = engine_check(d, tmp)
+            print('bugreport-check: held report %04d frame %d note %s, %s' % (
+                rep['report'], rep['frame'], json.dumps(rep['note']), line[len('bugreport-replay: '):] if line else 'no replay line'))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return 0
+
+
 def main():
     a = sys.argv[1:]
     if a[:1] == ['replay'] and len(a) >= 2:
@@ -436,6 +600,8 @@ def main():
         return check()
     if a == ['check-panel']:
         return check_panel()
+    if a == ['check-pad']:
+        return check_pad()
     sys.exit(__doc__)
 
 

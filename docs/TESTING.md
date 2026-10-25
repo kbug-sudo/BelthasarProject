@@ -2534,7 +2534,16 @@ The reporter's player side, under the interactive presentation without a window 
 dummy video driver): at frame 3200 the events of `~`, the panel (Dear ImGui, src/overlay.cpp) filled by text events and
 Enter (`CT_BUGPANEL_TYPE`); at frame 4000 the DualSense's touchpad button pressed and held -- a report at its 60th frame,
 "note to add". Graded: each report's note and category, its screen.png the window as drawn (512x448), and each replayed
-exactly in the engine, the second after the panel's pause. Needs `third_party/imgui`.
+exactly in the engine, the second after the panel's pause; a second session in 16:9 at 2x internal resolution, its report replayed with every mod off; the console kept (console.txt). Needs `third_party/imgui`.
+
+### bugreport-live-pad-records-what-the-player-pressed (`python tools/bugreport.py check-pad`)
+
+The reporter's recording of a player's own input (the path every real report takes, which `CT_PLAYINPUT` skips): the
+drive played on a virtual controller (`CT_BUGPAD`: SDL's controller state and button events through the default pad
+bindings), no replayed log. Graded: the session's inputs.log equals the drive (4700 frames, levels and edges) and its
+work RAM and picture hashes are the drive-played session's (bugreport-report-replays-on-both-sides); with Start held
+across a `~` panel (3195-3209, the panel at 3200) the game gets Start before the panel and not after it until the button
+is let go; every report replays exactly. Needs `third_party/imgui`.
 
 ### battle-enemy-census-defeat-exit-tail-hdma-vs-oracle (`python tools/battle_ab.py enemies 6E,E3,F4 -j3`)
 

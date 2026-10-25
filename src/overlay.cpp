@@ -333,6 +333,7 @@ extern "C" int CtOverlayBugPanel(char* note, int noteN, int* category) {
   ImGui::SetNextWindowSize(ImVec2(w, 0), ImGuiCond_Always);
   ImGui::Begin("Bug report", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                ImGuiWindowFlags_NoSavedSettings);
+  const bool popup = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);   // (Esc then closes the category list, not the panel)
   ImGui::TextUnformatted("What went wrong?");
   if (g_bugFocus > 0) { ImGui::SetKeyboardFocusHere(); g_bugFocus--; }
   ImGui::SetNextItemWidth(-1);
@@ -344,7 +345,7 @@ extern "C" int CtOverlayBugPanel(char* note, int noteN, int* category) {
   ImGui::SameLine();
   if (ImGui::Button("Cancel")) r = -1;
   if (!r && ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) r = 1;
-  if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) r = -1;
+  if (!popup && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) r = -1;
   ImGui::End();
   ImGui::Render();
   return r;
