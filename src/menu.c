@@ -34,6 +34,7 @@
 #include "tables/menu_equip.h"   // BAKED EQUIP data: the $7A00/$7B00/$7C00 item pages + the bonus/stat tables
 #include "tables/menu_techrom.h" // BAKED TECH data: the 37-group boundary/mask tables + the MP index page
 #include "ct_vm.h"   // CtGetName (the engine's $7E2C23 name-buffer analogue)
+#include "hdsrc.h"   // the HD presenter's records of what each pixel was drawn from (recorded only while it is on)
 
 // Byte at a ROM FILE OFFSET, served from the baked menu_romdata.h tables (item/tech names, tech range/MP/
 // maxcnt, config) so the menu needs NO runtime ROM. Offsets outside the baked ranges return 0. (This is a
@@ -365,6 +366,7 @@ static void mChromeTMPal2L(uint8_t* fb, const uint16_t* tm, int mode, const uint
       if (ti < 0 || ti >= CT_MENU_CHROME_NTILE) continue;
       const uint8_t* g = mSlotGlyph(pal, ti, pl);
       if (!g) g = mChromeGlyph(ti);
+      const int sInst = g_ctSrcOn && g ? CtSrcDraw(CtSrcOf(g, 8, 8), 0, 0, tx * 8, ty * 8) : 0;   // (the HD presenter's)
       // The whole dark WINDOW -- 9-slice FRAME bevel (0x3DC-0x3E7) + panel FILL (0x3E8-0x3EF) + Save
       // buttons (0x300-0x313) -- carries the HDMA colour-math ramp (mWinGrad); the marble desktop and
       // the ribbon box stay flat (the ROM keeps them outside the colour WINDOW, HDMA ch1 -> $2126).
@@ -392,6 +394,9 @@ static void mChromeTMPal2L(uint8_t* fb, const uint16_t* tm, int mode, const uint
             }
             uint8_t* d = fb + ((size_t)py * MW + px) * 3;
             d[0] = (uint8_t)r; d[1] = (uint8_t)gg; d[2] = (uint8_t)b;
+            if (g_ctSrcOn) { const uint32_t tg = sInst ? CtSrcTag(sInst, xx, yy) : 0;
+                             CtSrcPutTag(fb, MW, px, py, tg, r, gg, b);
+                             if (g_ctSrcCheck) CtSrcExpect(tg, v); }   // (the record names the index drawn: CT_SRCCHECK)
           }
         }
     }

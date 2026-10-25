@@ -2535,6 +2535,8 @@ dummy video driver): at frame 3200 the events of `~`, the panel (Dear ImGui, src
 Enter (`CT_BUGPANEL_TYPE`); at frame 4000 the DualSense's touchpad button pressed and held -- a report at its 60th frame,
 "note to add". Graded: each report's note and category, its screen.png the window as drawn (512x448), and each replayed
 exactly in the engine, the second after the panel's pause; a second session in 16:9 at 2x internal resolution, its report replayed with every mod off; the console kept (console.txt). Needs `third_party/imgui`.
+Two more sessions grade the touchpad: bound to Select in the options file it is that button and takes no report (`~`
+still does); held over the panel, its hold starts over when the panel closes (the panel's loop took its release).
 
 ### bugreport-live-pad-records-what-the-player-pressed (`python tools/bugreport.py check-pad`)
 
@@ -2565,6 +2567,82 @@ its whole pixel at 4x (`hdcheck:`), and against the native drawer at 4x at t = 2
 
 The same grade over Leene Square, whose map animates its tiles (the attract's field frames have none): each chip the
 animation changes is redrawn in the HD pictures, so the picture stays the frame at 4x for 1500 frames.
+
+### hd-presenter-changes-nothing-of-the-game (`python tools/hd_independence.py 00_newgame 13_canyon 21_inn`)
+
+The render-independence check (the remaster's Gate 2): legs of the playthrough route (tools/playthrough/route.txt) played
+from their start states as tools/playthrough.py plays them -- the first from power-on as an input log (`CT_PLAYINPUT`) --
+once with every mod off and once with the HD presenter drawing every frame (its art the automatic pass: no pack), each
+writing `CT_FRAMEHASH` (per frame the engine's 256x224 picture, its 128 KB of work RAM and its 8 KB battery, hashed). The
+two files must be equal on every frame, and a leg without its start state fails the run. Its mutations
+plant a presenter that writes one byte of the work RAM, one that writes one byte of the battery, and one that
+changes one pixel of the engine's own picture.
+
+### hd-presenter-in-the-players-presentation (`python tools/hd_independence.py session --headless --backend sdl`)
+
+The HD presenter as a player turns it on: `[video] presenter=hd` (16:9) in the options file, the interactive host's
+window and presentation (hidden, the probes' rule), the game from power-on on a virtual controller (`CT_BUGPAD`: SDL's
+controller state and events through the default pad bindings, no keyboard). Graded: the HD presenter drew (its coverage
+line), every texel it recorded names the index drawn (`srccheck:`, CT_SRCCHECK in the session), report.json says the HD
+presenter drew, and the report taken at frame 4700 in Crono's room replays exactly with every mod off. With `--fullscreen` and a
+real video driver the same command runs at the desktop's size on the player's backend (the remaster's 1080p run).
+
+### hd-presenter-records-name-the-texels-drawn (`Belthasar --scene 433 --frames 11000 --selftest`, `CT_SRCCHECK=1`)
+
+The HD presenter's records (src/hdsrc.c: what each pixel was drawn from -- a source's content, one draw of it with its
+flips, the texel) over the attract: every drawer that records a texel also says the index it drew there, and the record
+must hold that index (`srccheck: N texels recorded and checked, 0 name another index`). `hd-stats:` pins how much of the
+picture was recorded; its counts move with an intentional change to the drawers or the attract, the 0 never.
+`hd-pictures:` pins the hash of every HD picture drawn (the pack none: the automatic pass), so the art's colours, its
+rounding into a draw's transparent texels and its growth are graded, not only how much of the picture they cover.
+
+### hd-presenter-records-name-the-texels-drawn-in-a-battle (`Belthasar --scene 19 --loadwram forest_pre_wrapped.lakewram`)
+
+The same over a Guardia Forest fight (the attract's first 11000 frames hold none): the arena's map chips, the
+combatants' cells, the effects, the damage numbers, the HUD's window and text. The map's records are graded by their own
+test -- the recorded chip, in its colours, is the layer picture's pixel -- so a record cannot grade itself. `hd-coverage:`
+pins the share of the battle's picture drawn from HD art.
+
+### hd-presenter-draws-a-sub-screen-room-in-a-fight (`python tools/hd_independence.py 22_cathedral --coverage`)
+
+Route leg 22 (Manoria Cathedral) with and without the HD presenter, as hd-presenter-changes-nothing-of-the-game grades a
+leg, plus a `coverage:` line: the share of each mode's picture drawn from HD art and the exact count of pixels with a
+source and without (`hd-stats:`'s). The cathedral's map is on the sub screen under BG3's light; the arena's records fall
+back to the sub screen's top layer where the main screen shows only its backdrop (a blend over its record). Without it
+the fight drew 30-36% of its picture from HD art.
+
+### hd-presenter-refuses-art-past-its-palette (`python tools/hd_pack_check.py`)
+
+The HD pack reader on two one-entry packs: art naming an index its 16-colour source has is loaded, art naming index 200
+refuses the pack (a map chip's index is drawn as colour base + v of the 128, so a corrupt pack read past the palette).
+
+### regress-refresh-keeps-inputs-this-machine-lacks (`python tools/regress_selftest.py`)
+
+`regress.py --refresh-input-hashes` keeps a catalogued input that a check names only in its argv or env when this
+machine lacks the file (a state another machine makes), and adds no uncatalogued one.
+
+### hd-presenter-records-hold-on-a-picture-that-shows-another (`Belthasar --hdsrctest`)
+
+The records' contract for a picture assembled from another (the 16:9 battle's and sequence's, `CtSrcShows`): it takes no
+write of its own -- `CtSrcNone`, `CtSrcNoneRect`, `CtSrcBlend`, a copy with nothing to copy -- and reads the other's record
+through it at its column. The mutations drop each write's guard (the alias has no arrays: a crash).
+
+### hd-presenter-in-16-9-through-a-fight (`python tools/hd_independence.py session --headless --backend sdl --legs 13`)
+
+The player's presentation at 16:9 from power-on through the canyon's first fight and out of it, on the virtual
+controller: the report taken after the fight replays with every mod off, its work RAM identical. (Its picture differs:
+the bug reporter crops the 16:9 window's native picture, the vanilla presenter too -- not graded here.)
+
+### hd-presenter-turns-off-and-on (`Belthasar --scene 433 --frames 5000 --selftest`, `CT_HD_PRESENTER=2500-4000`)
+
+The HD presenter on over frames 2500-4000 of the attract only, as a player turning it on and off in the options: its
+records are kept on exactly those 1501 frames (`hd-stats:`), none after.
+
+### hd-automatic-pass-writes-the-same-pack (`Belthasar --hdautopass build`)
+
+The automatic pass (Scale2x twice on the palette indices) over every location's chips, their animation sets and every
+sprite's tiles writes the same pack, entry for entry (its fnv). The pack is the remaster's private build product; this
+file is not committed (`*.pack` is ignored).
 
 ### battle-enemy-census-defeat-exit-tail-hdma-vs-oracle (`python tools/battle_ab.py enemies 6E,E3,F4 -j3`)
 

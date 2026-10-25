@@ -199,6 +199,14 @@ extern "C" int CtOverlayFrame(void) {
       if (ImGui::IsItemHovered())
         ImGui::SetTooltip("The field's picture drawn at %dx%d: objects and the camera get positions between the SNES's\n"
                           "pixels. With frames between, 1x uses 4x.", 256 * s->renderScale, 224 * s->renderScale);
+      const char* presenters[] = { "Vanilla (the SNES's picture)", "HD (redrawn from HD art)" };
+      ImGui::Combo("Presenter", &s->presenter, presenters, 2);
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("HD: every picture is drawn again at 4x (1024x896, the internal resolution's 4x) from HD art\n"
+                          "keyed by the original tiles, sprites and font glyphs -- each one in exactly the original's place,\n"
+                          "coloured by the game's own palettes, fades and colour math. The art is the folder CT_HD_DIR names\n"
+                          "(hd\\ beside the game by default); a tile it lacks is upscaled on the spot. The game itself is\n"
+                          "untouched: the same frames, the same RAM, the same saves as Vanilla.");
       bool vs = s->vsync != 0;
       if (ImGui::Checkbox("VSync", &vs)) { s->vsync = vs; ch |= CT_OVL_VIDEO; }
 #ifndef __ANDROID__                                        // (Android: SDL_Renderer on OpenGL ES, the only backend)

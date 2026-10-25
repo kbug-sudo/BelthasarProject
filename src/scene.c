@@ -362,6 +362,7 @@ typedef struct {
                                            //   (L1 1, L2 2, L3 4) of the pixel on top, 0 = backdrop
   uint8_t* layRgb[6]; uint8_t* layCov[6]; int layW[6], layH[6], layDirty;   // CtFieldSceneLayers, built on demand
   CtSceneCell* layCell[6]; unsigned layGen;              // ...and the chip each cell of them shows (CtFieldSceneLayerCells)
+  unsigned serial;                                       // ...and this open scene's number (CtSceneLayerCells.scene)
   int bakedO[4];                           // the layer offsets the last bake drew at (l2ox l2oy l3ox l3oy then)
   uint8_t* bakeMotCov;                     // ...and the layer the pixel's picture comes from: the main screen's, else the
                                            //   sub screen's where only it shows (motion.h: what the pixel moves with)
@@ -779,6 +780,8 @@ void* CtFieldSceneOpen(const CtAssets* a, int index, int frame) {
   if (!sd) return NULL;
   CtLoadSceneFromAssets(a, index, frame, sd, 0);
   if (sd->w1 == 0) { CtFreeSceneData(sd); free(sd); return NULL; }
+  static unsigned serials;                         // (a presenter tells two open scenes apart by it, never by an address)
+  sd->serial = ++serials;
   return sd;
 }
 void CtFieldSceneClose(void* h) {
@@ -913,7 +916,7 @@ int CtFieldSceneLayerCells(void* h, CtSceneLayerCells* o) {
     o->chips[i] = ordLay[i] == 2 ? sd->chips3 : sd->chips12; o->nchips[i] = ordLay[i] == 2 ? sd->nchips3 : 768;
   }
   o->pal = (const uint8_t (*)[3])sd->pal;
-  o->gen = sd->layGen;
+  o->gen = sd->layGen; o->scene = sd->serial;
   return 1;
 }
 const uint8_t* CtFieldSceneAnimChips(void* h, int* n) {
@@ -1241,10 +1244,14 @@ void CtFieldSceneCopyTiles(void* h, int sl, int st, int el, int eb, int dl, int 
 // units*4 chip u16 + units*2 signed offset bytes. Each of the 4 chips per unit is a
 // quadrant (TL/TR/BL/BR); chip low 10 bits = source tile, 0x4000 flip-x, 0x8000 flip-y.
 int CtComposeSprite(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal) {
-  return CtComposeSpriteHalves(blob, blobLen, frame, out, outPal, NULL, NULL);
+  return CtComposeSpriteUnits(blob, blobLen, frame, out, outPal, NULL, NULL, NULL);
+}
+int CtComposeSpriteHalves(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box,
+                          uint8_t* half) {
+  return CtComposeSpriteUnits(blob, blobLen, frame, out, outPal, box, half, NULL);
 }
 int CtComposeSpriteBox(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box) {
-  return CtComposeSpriteHalves(blob, blobLen, frame, out, outPal, box, NULL);
+  return CtComposeSpriteUnits(blob, blobLen, frame, out, outPal, box, NULL, NULL);
 }
 // WHICH PRIORITY BYTE EACH UNIT TAKES -- the anim drain's attr fill, read off the four class bodies (bank C0):
 //   class 0 (4 units), C0/CD47-CDBB and its twin C0/CE77..: per unit, `LDA $7F4804,X` (the unit's Y offset, the frame
@@ -1255,9 +1262,10 @@ int CtComposeSpriteBox(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t
 //   class 2 (12 units), C0/DA23-DA5C / C0/DCE2.. / C0/DEE7-DF20 / C0/E0E2..: units 0-3 $0C00, units 4-11 $0C01.
 //   class 3 (24 units), C0/E4D1-E52F: `LDA #22` into all 24 attrs -- OBJ priority 2, neither byte read.
 // `half` (may be NULL) receives, per opaque pixel, the source of the unit that owns it: 0 = $0C00, 1 = $0C01, 2 = the
-// fixed priority 2. disasm/notes/field_obj_unit_priority.md.
-int CtComposeSpriteHalves(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box,
-                          uint8_t* half) {
+// fixed priority 2. disasm/notes/field_obj_unit_priority.md. `unit` (may be NULL) receives, per opaque pixel, the frame
+// record's chip slot k that owns it, + 1 (0 = none): CtSpriteCell says which chip that is and where (the HD presenter's).
+int CtComposeSpriteUnits(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box,
+                         uint8_t* half, uint8_t* unit) {
   int bx0 = CT_SPR_W, by0 = CT_SPR_H, bx1 = -1, by1 = -1;
   if (box) { box[0] = bx0; box[1] = by0; box[2] = bx1; box[3] = by1; }
   if (!blob || blobLen < 4 + 48) return 0;
@@ -1275,6 +1283,7 @@ int CtComposeSpriteHalves(const uint8_t* blob, uint32_t blobLen, int frame, uint
   const uint8_t* offs = fr + (uint32_t)units * 8;        // after units*4 u16 chips
   memcpy(outPal, pal, 48);
   memset(out, 0, CT_SPR_W * CT_SPR_H);
+  if (unit) memset(unit, 0, CT_SPR_W * CT_SPR_H);
   for (int k = 0; k < units * 4; k++) {
     int chip = fr[k * 2] | (fr[k * 2 + 1] << 8);
     int src = chip & 0x3FF;
@@ -1298,12 +1307,34 @@ int CtComposeSpriteHalves(const uint8_t* blob, uint32_t blobLen, int frame, uint
         if (px >= 0 && px < CT_SPR_W && py >= 0 && py < CT_SPR_H && !out[py * CT_SPR_W + px]) {
           out[py * CT_SPR_W + px] = v;
           if (half) half[py * CT_SPR_W + px] = hs;
+          if (unit) unit[py * CT_SPR_W + px] = (uint8_t)(k + 1);
           if (px < bx0) bx0 = px; if (px > bx1) bx1 = px;
           if (py < by0) by0 = py; if (py > by1) by1 = py;
         }
       }
   }
   if (box) { box[0] = bx0; box[1] = by0; box[2] = bx1; box[3] = by1; }
+  return 1;
+}
+// Chip slot k of the frame (CtComposeSpriteUnits' `unit` - 1): its 8x8 chip (64 indices, as stored: unflipped), its flips
+// (1 x, 2 y) and its top-left in the CT_SPR_W x CT_SPR_H buffer. 0 = no such chip.
+int CtSpriteCell(const uint8_t* blob, uint32_t blobLen, int frame, int k, const uint8_t** tile, int* flags, int* x0, int* y0) {
+  if (!blob || blobLen < 4 + 48) return 0;
+  int size = blob[0] & 3, nframes = blob[1], ntiles = blob[2] | (blob[3] << 8);
+  static const int UNITS[4] = { 4, 8, 12, 24 };
+  int units = UNITS[size];
+  if (frame < 0 || frame >= nframes || k < 0 || k >= units * 4) return 0;
+  const uint8_t* tiles = blob + 4 + 48;
+  uint32_t framesz = (uint32_t)units * 10;
+  if (blobLen < 4 + 48 + (uint32_t)ntiles * 64 + framesz * (uint32_t)(frame + 1)) return 0;
+  const uint8_t* fr = tiles + (uint32_t)ntiles * 64 + (uint32_t)frame * framesz;
+  const uint8_t* offs = fr + (uint32_t)units * 8;
+  int chip = fr[k * 2] | (fr[k * 2 + 1] << 8), src = chip & 0x3FF;
+  if (src >= ntiles) return 0;
+  *tile = tiles + (uint32_t)src * 64;
+  *flags = ((chip & 0x4000) ? 1 : 0) | ((chip & 0x8000) ? 2 : 0);
+  *x0 = (int8_t)offs[(k / 4) * 2] + ((k & 1) ? 8 : 0) + CT_SPR_OX;
+  *y0 = (int8_t)offs[(k / 4) * 2 + 1] + ((k & 2) ? 8 : 0) + CT_SPR_OY;
   return 1;
 }
 

@@ -501,6 +501,10 @@ def panel_session(tmp, name, ini, keys, typed, reports):
     return report_dirs(bugs)
 
 
+def report_frames(ds):
+    return ', '.join('%d' % json.load(open(os.path.join(d, 'report.json'), encoding='utf-8'))['frame'] for d in ds) or 'none'
+
+
 def check_panel():
     tmp = tempfile.mkdtemp(prefix='ct_bugpanel_')
     try:
@@ -525,6 +529,14 @@ def check_panel():
         con = open(os.path.join(ds[0], 'console.txt'), encoding='utf-8', errors='replace').read().splitlines()
         print('bugreport-check: console.txt %s the session\'s start' % (
             'holds' if any(l.startswith('[bugreport] replaying') for l in con) else 'LACKS'))
+        # the touchpad bound to a button of the game is that button: no report from it, `~` still takes one
+        fr = report_frames(panel_session(tmp, 'bound', '[controls]\npad_select=touchpad\n', '3100:touch,3300:grave',
+                                         'the touchpad is Select', 1))
+        print('bugreport-check: the touchpad bound to Select, held from 3100, `~` at 3300: reports at %s' % fr)
+        # held over the panel (`~` at 3150): the panel takes its events, so its hold starts over when the panel closes --
+        # no report 60 frames after a press the player may have let go of over the panel
+        fr = report_frames(panel_session(tmp, 'modal', '', '3100:touch,3150:grave,3400:grave', 'over a held touchpad', 2))
+        print('bugreport-check: the touchpad held from 3100, `~` at 3150 and 3400: reports at %s' % fr)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return 0

@@ -518,17 +518,10 @@ def _input_origins():
     return out
 
 
-def do_refresh_input_hashes():
-    """Rewrite sha256/size/present_when_recorded for every catalogued path that exists, `used_by` from the checks as
-    they are, the kind and provenance of the inputs a recipe or a public source makes, and drop the entries no check
-    reads any more (a check moved to a recipe-made twin)."""
-    man = load_inputs_manifest()
-    if not man:
-        print("regress: missing %s" % INPUTS_JSON)
-        return 2
-    # Merge any checks.json inputs that are not yet catalogued.
-    checks = load_checks()
-    by_path = {e["path"].replace("\\", "/"): e for e in man.get("inputs", [])}
+def _input_users(checks, by_path):
+    """The checks that read each input: its `inputs`, and a file its argv or env names (as tools/input_provenance.py
+    finds them) -- one this machine has, or one the catalogue already holds (a state another machine makes is still
+    read here). Adds to `by_path` every listed input not yet catalogued."""
     users = {}
     for c in checks["checks"]:
         for p in c.get("inputs", []):
@@ -545,11 +538,25 @@ def do_refresh_input_hashes():
                     "size": None,
                     "present_when_recorded": False,
                 }
-        # a file the check runs or reads through its argv or env is read too (as tools/input_provenance.py finds them)
         for a in c.get("argv", []) + list((c.get("env") or {}).values()):
             for p in _PATH_REF.findall(str(a)):
-                if os.path.isfile(os.path.join(ROOT, p)):
+                if p in by_path or os.path.isfile(os.path.join(ROOT, p)):
                     users.setdefault(p, set()).add(c["name"])
+    return users
+
+
+def do_refresh_input_hashes():
+    """Rewrite sha256/size/present_when_recorded for every catalogued path that exists, `used_by` from the checks as
+    they are, the kind and provenance of the inputs a recipe or a public source makes, and drop the entries no check
+    reads any more (a check moved to a recipe-made twin)."""
+    man = load_inputs_manifest()
+    if not man:
+        print("regress: missing %s" % INPUTS_JSON)
+        return 2
+    # Merge any checks.json inputs that are not yet catalogued.
+    checks = load_checks()
+    by_path = {e["path"].replace("\\", "/"): e for e in man.get("inputs", [])}
+    users = _input_users(checks, by_path)
     origins = _input_origins()
     try:
         git = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True)

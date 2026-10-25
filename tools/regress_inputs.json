@@ -576,8 +576,15 @@
         "follower-conga-2member",
         "follower-conga-3member",
         "harness-play-goal-and-failure",
+        "hd-presenter-changes-nothing-of-the-game",
+        "hd-presenter-draws-a-sub-screen-room-in-a-fight",
         "hd-presenter-field-animated-tiles-at-4x",
         "hd-presenter-field-equals-the-frame-at-4x",
+        "hd-presenter-in-16-9-through-a-fight",
+        "hd-presenter-in-the-players-presentation",
+        "hd-presenter-records-name-the-texels-drawn",
+        "hd-presenter-records-name-the-texels-drawn-in-a-battle",
+        "hd-presenter-turns-off-and-on",
         "jackie-saves-census-vs-oracle",
         "joypad",
         "lavos-day-ff07-plays-through-to-the-title-in-the-port",
@@ -1497,8 +1504,17 @@
         "follower-conga-2member",
         "follower-conga-3member",
         "harness-play-goal-and-failure",
+        "hd-automatic-pass-writes-the-same-pack",
+        "hd-presenter-changes-nothing-of-the-game",
+        "hd-presenter-draws-a-sub-screen-room-in-a-fight",
         "hd-presenter-field-animated-tiles-at-4x",
         "hd-presenter-field-equals-the-frame-at-4x",
+        "hd-presenter-in-16-9-through-a-fight",
+        "hd-presenter-in-the-players-presentation",
+        "hd-presenter-records-name-the-texels-drawn",
+        "hd-presenter-records-name-the-texels-drawn-in-a-battle",
+        "hd-presenter-refuses-art-past-its-palette",
+        "hd-presenter-turns-off-and-on",
         "jackie-saves-census-vs-oracle",
         "lavos-day-chain-in-the-port",
         "lavos-day-ff07-plays-through-to-the-title-in-the-port",
@@ -2278,7 +2294,8 @@
         "battle-motion-owners-explain-the-fight",
         "field-battle-forest-camera-composite",
         "field-battle-forest-return",
-        "field-gameover-reboots-to-title"
+        "field-gameover-reboots-to-title",
+        "hd-presenter-records-name-the-texels-drawn-in-a-battle"
       ],
       "kind": "fixture_lakewram",
       "regenerable": true,
@@ -5319,8 +5336,8 @@
         "boot-title-opening-no-false-start-vs-rule-cartridge",
         "ow-ferry-both-ways-vs-rule-cartridge"
       ],
-      "sha256": "c86f9f9ffa80b56d98e30a7462047c8cffdd86cbdcb81abf3d929a2b4bb95888",
-      "size": 1706448,
+      "sha256": "aaaf58d27abe102092b03cd20284a467a9b682d6c42a434ce0d6f83ac0d02ae2",
+      "size": 1726151,
       "present_when_recorded": true
     },
     {
@@ -5730,10 +5747,12 @@
       "used_by": [
         "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
-        "bugreport-report-replays-on-both-sides"
+        "bugreport-report-replays-on-both-sides",
+        "hd-presenter-in-16-9-through-a-fight",
+        "hd-presenter-in-the-players-presentation"
       ],
-      "sha256": "5eb595b5d1e90e9160b0df71997d83d5002e36476449882fcec80372c0f91950",
-      "size": 33847,
+      "sha256": "ce7a9f002e93dbd2d5afc3edf1106efebecd183837c6aa362f65adab4cf92aef",
+      "size": 34844,
       "present_when_recorded": true
     },
     {
@@ -5744,7 +5763,8 @@
       "used_by": [
         "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
-        "bugreport-report-replays-on-both-sides"
+        "bugreport-report-replays-on-both-sides",
+        "hd-presenter-in-the-players-presentation"
       ],
       "sha256": "6f06d92f8bf2b74f05a7f2749a81f771f9b793fd881a05d159334b86a95a31bf",
       "size": 1626,
@@ -6018,6 +6038,33 @@
       ],
       "sha256": "aecfc7e3da7e88130eebd4d8f5982faac8ed7607806d87f03aa2bfe7912118c7",
       "size": 7018,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/hd_independence.py",
+      "kind": "tool",
+      "regenerable": false,
+      "how": "In git: the file at the checked-out commit.",
+      "used_by": [
+        "hd-presenter-changes-nothing-of-the-game",
+        "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+        "hd-presenter-in-16-9-through-a-fight",
+        "hd-presenter-in-the-players-presentation"
+      ],
+      "sha256": "fc28ac385e87895961b9871e38fbdb666abe2f7906411b3e6a63a7ebaa2c100f",
+      "size": 15302,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/hd_pack_check.py",
+      "kind": "tool",
+      "regenerable": false,
+      "how": "In git: the file at the checked-out commit.",
+      "used_by": [
+        "hd-presenter-refuses-art-past-its-palette"
+      ],
+      "sha256": "bf887357ff6963c49c821353d81de17a6cbc04bf8d091ad149d0f77547aede6f",
+      "size": 2488,
       "present_when_recorded": true
     },
     {
@@ -6330,6 +6377,9 @@
       "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
+        "hd-presenter-changes-nothing-of-the-game",
+        "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+        "hd-presenter-in-16-9-through-a-fight",
         "playthrough-legs-vs-rule-cartridge"
       ],
       "sha256": "21719e90f4b2f4e58b8935eeeb4cb81c01d366abc1d654331229eb38614c17be",
@@ -6342,6 +6392,9 @@
       "regenerable": false,
       "how": "In git: the file at the checked-out commit.",
       "used_by": [
+        "hd-presenter-changes-nothing-of-the-game",
+        "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+        "hd-presenter-in-16-9-through-a-fight",
         "playthrough-legs-vs-rule-cartridge"
       ],
       "sha256": "dd94ca67286c77ae4afd71952f4360a36324197eaf8a9a97dd347ccbd5d8d3bd",

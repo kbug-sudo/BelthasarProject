@@ -11,6 +11,9 @@
 ct_debug_log.txt
 # The bug reporter's reports (src/bugreport.c, CT_BUG_DIR's default) hold the game's state and pictures
 /bug_reports/
+# The HD presenter's art (src/hdpresent.c, CT_HD_DIR's default `hd`): its packs hold the ROM's decoded tiles
+/hd/
+*.pack
 # The old private tree's git history (a bundle with ROM-derived files in it): local only, never published
 /private_history/
 *.dat

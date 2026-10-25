@@ -16,7 +16,7 @@
 #define ct_pipe(fds) _pipe(fds, 65536, _O_BINARY | _O_NOINHERIT)
 static void ct_noinherit(int fd) { SetHandleInformation((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 0); }
 #define ct_dup _dup
-#define ct_dup2 _dup2
+static int ct_dup2(int from, int to) { return _dup2(from, to) == 0 ? to : -1; }   // (dup2's contract: the new fd, or -1)
 #define ct_read _read
 #define ct_write _write
 #define ct_close _close
@@ -83,13 +83,13 @@ void CtBugConsoleStart(void) {
     int fds[2];
     if (ct_pipe(fds) != 0) continue;
     g_str[k].orig = ct_dup(g_str[k].fd);
-    if (g_str[k].orig < 0 || ct_dup2(fds[1], g_str[k].fd) != 0) {
+    if (g_str[k].orig < 0 || ct_dup2(fds[1], g_str[k].fd) < 0) {
       ct_close(fds[0]); ct_close(fds[1]); if (g_str[k].orig >= 0) ct_close(g_str[k].orig); g_str[k].orig = -1; continue; }
     ct_close(fds[1]);
     ct_noinherit(g_str[k].orig); ct_noinherit(g_str[k].fd); ct_noinherit(fds[0]);
     g_str[k].readEnd = fds[0];
     g_str[k].th = SDL_CreateThread(conReader, k ? "bugcon-err" : "bugcon-out", (void*)(intptr_t)k);
-    if (!g_str[k].th) { ct_dup2(g_str[k].orig, g_str[k].fd); ct_close(fds[0]); }
+    if (!g_str[k].th) { ct_dup2(g_str[k].orig, g_str[k].fd); ct_close(fds[0]); ct_close(g_str[k].orig); g_str[k].orig = -1; }
   }
   setvbuf(stdout, NULL, _IONBF, 0);
   setvbuf(stderr, NULL, _IONBF, 0);

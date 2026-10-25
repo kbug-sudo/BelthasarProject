@@ -53,6 +53,7 @@ typedef struct CtSceneLayerCells {
   const uint8_t* chips[6]; int nchips[6];         // the chips the picture draws from: 64 indices each, row by row
   const uint8_t (*pal)[3];                        // the 128 colours the pictures were drawn with
   unsigned gen;
+  unsigned scene;                                 // the open scene's number: another scene, another number
 } CtSceneLayerCells;
 int CtFieldSceneLayerCells(void* h, CtSceneLayerCells* out);   // 1 = filled (builds the pictures if they are not)
 // The location's chip animation set: every chip its animation copies into the map's chips (64 indices each); NULL = none.
@@ -119,5 +120,11 @@ int CtComposeSpriteBox(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t
 // the top). See scene.c.
 int CtComposeSpriteHalves(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box,
                           uint8_t* half);
+// ...and `unit` (may be NULL; CT_SPR_W x CT_SPR_H) receives, per opaque pixel, the frame record's chip slot that owns
+// it + 1 (0 = none) -- with CtSpriteCell, which 8x8 chip and texel the pixel shows (the HD presenter's records, hdsrc.h).
+int CtComposeSpriteUnits(const uint8_t* blob, uint32_t blobLen, int frame, uint8_t* out, uint8_t* outPal, int* box,
+                         uint8_t* half, uint8_t* unit);
+// Chip slot k of `frame`: its 64 indices as stored (unflipped), flips (1 x, 2 y), its top-left in the CT_SPR buffer.
+int CtSpriteCell(const uint8_t* blob, uint32_t blobLen, int frame, int k, const uint8_t** tile, int* flags, int* x0, int* y0);
 
 #endif

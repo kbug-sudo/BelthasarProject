@@ -57,7 +57,7 @@ typedef struct CtMotFrame {
   // EVERY PIXEL EACH SPRITE PUT DOWN, as it put it (before the brightness), the ones another sprite or the foreground then
   // covered included: what a sprite moving off another uncovers is that other sprite, not the map.
   int nspx;
-  struct { int16_t x, y; uint8_t r, g, b, own, hole, pal; } spx[CT_MOT_MAXSPX];   // hole: an occluder's (the map shows); pal: its OBJ palette (0xFF: none)
+  struct { int16_t x, y; uint8_t r, g, b, own, hole, pal; uint32_t tag; } spx[CT_MOT_MAXSPX];   // hole: an occluder's (the map shows); pal: its OBJ palette (0xFF: none); tag: its record (hdsrc.h, the HD presenter's; 0 none)
   const void* native;                     // the map's layers when the frame can be drawn natively (fieldnative.c), else NULL
   const void* nativeFx;                   // the field's iris / colour window / caption plane for the native drawer (fieldnative.h)
   const void* owNative;                   // the overworld's own (field.c OwNat) when it can be drawn natively, else NULL
@@ -80,13 +80,13 @@ static inline void CtMotSpritePixel(CtMotFrame* m, int x, int y, int r, int g, i
   if (!m || m->nspx >= CT_MOT_MAXSPX || (own & 0x7F) < CT_MOT_SPR) return;
   m->spx[m->nspx].x = (int16_t)x; m->spx[m->nspx].y = (int16_t)y;
   m->spx[m->nspx].r = (uint8_t)r; m->spx[m->nspx].g = (uint8_t)g; m->spx[m->nspx].b = (uint8_t)b; m->spx[m->nspx].own = (uint8_t)own;
-  m->spx[m->nspx].hole = 0; m->spx[m->nspx].pal = 0xFF;
+  m->spx[m->nspx].hole = 0; m->spx[m->nspx].pal = 0xFF; m->spx[m->nspx].tag = 0;
   m->nspx++;
 }
 static inline void CtMotSpriteHole(CtMotFrame* m, int x, int y, int own) {   // an occluder's pixel: what is under it goes
   if (!m || m->nspx >= CT_MOT_MAXSPX || (own & 0x7F) < CT_MOT_SPR) return;
   m->spx[m->nspx].x = (int16_t)x; m->spx[m->nspx].y = (int16_t)y; m->spx[m->nspx].own = (uint8_t)own; m->spx[m->nspx].hole = 1;
-  m->spx[m->nspx].r = m->spx[m->nspx].g = m->spx[m->nspx].b = 0; m->spx[m->nspx].pal = 0xFF;
+  m->spx[m->nspx].r = m->spx[m->nspx].g = m->spx[m->nspx].b = 0; m->spx[m->nspx].pal = 0xFF; m->spx[m->nspx].tag = 0;
   m->nspx++;
 }
 // The picture after the compositor (`pic`, RGB w x 224) against the final frame (`fb`, after the overlays and the

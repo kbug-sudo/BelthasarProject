@@ -46,6 +46,7 @@
 #include "overlay.h"     // the F1 options overlay (Dear ImGui; a stub without third_party/imgui)
 #include "bugreport.h"   // the bug reporter (`~`): the session's input log, its reports and their replay
 #include "hdpresent.h"   // the HD presenter (a mod): the field redrawn at 4x from HD art keyed by the original chips
+#include "hdsrc.h"       // ...and what each pixel of a picture was drawn from (recorded only while it is on)
 #include "touchpad.h"    // the on-screen virtual gamepad (a player option; on by default on Android only)
 #ifdef __ANDROID__
 #include "android.h"     // where the player's ROM, ct_assets.dat, save and options live on the device
@@ -258,6 +259,9 @@ static void hostDrawPicture(CtPresenter* pr) {
 // The window's size for the options: the picture at `windowScale` (4:3 widens it).
 static void hostWindowSize(int* w, int* h) {
   const CtSettings* st = CtSettingsGet();
+  { const char* ws = getenv("CT_WINDOW");            // CT_WINDOW=<w>x<h> (probe): the window's size, the options' aside
+    int pw = 0, ph = 0;
+    if (ws && sscanf(ws, "%dx%d", &pw, &ph) == 2 && pw > 0 && ph > 0) { *w = pw; *h = ph; return; } }
   int k = st->windowScale < 1 ? 1 : st->windowScale;
   *h = CAMH * k;
   *w = (int)(hostWideW() * k * (st->aspect == CT_ASPECT_4_3 ? 7.0 / 6.0 : 1.0) + 0.5);
@@ -1375,11 +1379,21 @@ static void worldObjLinePieces(const World* w, int y, uint8_t* pix, uint8_t* pri
 // OBSEL ($2101) as the world last wrote it: $60 on every world (16 / 32 pixel sprites from VRAM word 0, C2/6AB8), $03 inside
 // the time gauge (8 / 16 from word $6000, C2/6A41).
 static uint8_t g_owObsel = 0x60;
+// The HD presenter's record of each OBJ pixel of the line worldObjLine last evaluated (hdsrc.h; 0 = none): the sliver's
+// VRAM character (4bpp, at word `adr`), one draw an OAM entry's cell a frame.
+static uint32_t g_owObjTag[CT_MOT_W]   /* (OW_WMAX) */;
+static uint32_t owObjTag(const World* w, int i, int cellRow, int cellCol, unsigned adr, int flags, int tx, int ty) {
+  uint32_t key = CT_SRC_KEY(11, (uint32_t)i << 8 | (uint32_t)cellRow << 4 | (uint32_t)cellCol);
+  int inst = CtSrcCellFind(key);
+  if (!inst && w->vram) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf4bpp(w->vram + (size_t)(adr & 0x7FFF) * 2), flags, 0, 0, 0));
+  return inst > 0 ? CtSrcTag(inst, tx, ty) : 0;
+}
 static void worldObjLine(const World* w, int y, uint8_t* pix, uint8_t* pri, uint8_t* oi, int W, int X0) {
   static const int kSizes[8][2] = { { 8, 16 }, { 8, 32 }, { 8, 64 }, { 16, 32 }, { 16, 64 }, { 32, 64 }, { 16, 32 }, { 16, 32 } };
   const int* sizes = kSizes[(g_owObsel >> 5) & 7];             // ppu.c spriteSizes
   const uint8_t* o = w->oamShow;
   memset(pix, 0, (size_t)W);
+  if (g_ctSrcOn) memset(g_owObjTag, 0, sizeof g_owObjTag);
   int line = y, found[32], nf = 0, tiles = 0;
   for (int i = 0; i < 128; i++) {
     int hi = (o[0x200 + (i >> 2)] >> ((i & 3) * 2)) & 3;
@@ -1418,7 +1432,9 @@ static void worldObjLine(const World* w, int y, uint8_t* pix, uint8_t* pri, uint
         int v = ((plane1 >> shift) & 1) | (((plane1 >> (8 + shift)) & 1) << 1) |
                 (((plane2 >> shift) & 1) << 2) | (((plane2 >> (8 + shift)) & 1) << 3);
         int sc = col + x + X0 + px;
-        if (v && sc >= 0 && sc < W) { pix[sc] = (uint8_t)(0x80 + 16 * palette + v); pri[sc] = (uint8_t)prio; if (oi) oi[sc] = (uint8_t)i; }
+        if (v && sc >= 0 && sc < W) { pix[sc] = (uint8_t)(0x80 + 16 * palette + v); pri[sc] = (uint8_t)prio; if (oi) oi[sc] = (uint8_t)i;
+          if (g_ctSrcOn) g_owObjTag[sc] = owObjTag(w, i, row / 8, usedCol / 8, objAdr + usedTile * 16u,
+                                                   (hflip ? 1 : 0) | ((word & 0x8000) ? 2 : 0), hflip ? 7 - px : px, row & 7); }
       }
     }
   }
@@ -1430,6 +1446,7 @@ static void worldObjLine(const World* w, int y, uint8_t* pix, uint8_t* pri, uint
 static void worldObjLinePieces(const World* w, int y, uint8_t* pix, uint8_t* pri, int16_t* oi, int W, int X0) {
   static const int sizes[2] = { 16, 32 };
   memset(pix, 0, (size_t)W);
+  if (g_ctSrcOn) memset(g_owObjTag, 0, sizeof g_owObjTag);   // (the pieces are not recorded)
   for (int k = w->wideShowN - 1; k >= 0; k--) {
     const CtWorldPiece* P = &w->wideShow[k];
     int size = sizes[P->size & 1];
@@ -1846,6 +1863,19 @@ static void worldComposeMap(World* w, uint8_t* fb) {
   }
   g_owObsel = keep;
 }
+// The HD presenter's record of a world BG pixel (hdsrc.h): tile cell (col, row) of BG `bg` -- its VRAM character, 4bpp,
+// one draw a cell a frame -- at texel (tx, ty) (the flips applied: the character's own pixel).
+static uint32_t owSrcTag(const World* w, int bg, int col, int row, uint16_t chip, int tx, int ty, int x, int y) {
+  uint32_t key = CT_SRC_KEY(9 + bg, (row << 6) | col);
+  int inst = CtSrcCellFind(key);
+  if (!inst) {
+    int t = chip & 0x3FF;
+    if (!w->vram || (size_t)(t + 512) * 32 + 32 > 0x10000) return 0;   // (VRAM: 64 KB)
+    inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf4bpp(w->vram + (size_t)(t + 512) * 32), ((chip & 0x4000) ? 1 : 0) | ((chip & 0x8000) ? 2 : 0), 0,
+                                       x - ((chip & 0x4000) ? 7 - tx : tx), y - ((chip & 0x8000) ? 7 - ty : ty)));
+  }
+  return inst > 0 ? CtSrcTag(inst, tx, ty) : 0;
+}
 static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldStream* stm) {
   // ⭐ THE COLOUR MATH IS PER-WORLD, read from the CGADSUB shadow $0046 (the byte the overworld NMI
   // pushes to $2131 every frame, C2/0296 `LDA $46 / STA $2131`). Each world's LOAD SCRIPT stores it
@@ -1877,6 +1907,7 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
   // layer order is BG1p1 > BG2p1 > OBJ(p2 = player) > BG1p0 > BG2p0 > BG3p0, so priority-1 tiles
   // (treetops, structures, arches) draw OVER the player -- a second overlay pass after the sprites.
   static int16_t fgci[CAMH * OW_WMAX];
+  static uint32_t fgTag[CAMH * OW_WMAX];             // (the HD presenter's record of BG1's priority-1 pixel there)
   // Which BG1/BG2 pixels are opaque, and at which priority: bit0 BG1p1, bit1 BG2p1, bit2 BG1p0, bit3 BG2p0 -- what an OBJ
   // pixel is measured against (ppu.c layersPerMode[8], mode 1 with the BG3 priority bit, $1E = $09: BG3p1 / OBJ3 / BG1p1 /
   // BG2p1 / OBJ2 / BG1p0 / BG2p0 / OBJ1 / OBJ0 / BG3p0).
@@ -1897,6 +1928,7 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
     if (hdmaEn & 0x08) { uint16_t hv; if (owHdmaWordAt(w->wram, hdmaEn, 0x0E, y + OW_HDMA_LINE, &hv)) bg1vL = hv; }
     for (int x = 0; x < W; x++) {
       int p0 = -1, p1 = -1, p1bg1 = -1, p0bg = 5, p1bg = 5;
+      uint32_t sTag0 = 0, sTag1 = 0;                   // (the HD presenter's records of the two candidates)
       bgCover[y * W + x] = 0;
       for (int bg = 0; bg < 2; bg++) {                 // BG1 over BG2 (both transparent at idx 0)
         if (!(tmain & (1 << bg))) continue;             // $212C bit0 BG1 / bit1 BG2
@@ -1914,9 +1946,9 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
                                (((w->vram[bi + 16] >> k) & 1) << 2) | (((w->vram[bi + 17] >> k) & 1) << 3));
         if (!v4) continue;
         bgCover[y * W + x] |= (uint8_t)((chip & 0x2000) ? (1 << bg) : (4 << bg));
-        if (chip & 0x2000) { if (p1 < 0) { p1 = pb + v4; p1bg = bg; }     // priority-1 = foreground
-                             if (bg == 0 && p1bg1 < 0) p1bg1 = pb + v4; }
-        else if (p0 < 0) { p0 = pb + v4; p0bg = bg; }      // priority-0 = background
+        if (chip & 0x2000) { if (p1 < 0) { p1 = pb + v4; p1bg = bg; if (g_ctSrcOn) sTag1 = owSrcTag(w, bg, col, row, chip, tx, ty, x, y); }   // priority-1 = foreground
+                             if (bg == 0 && p1bg1 < 0) { p1bg1 = pb + v4; if (g_ctSrcOn) fgTag[y * W + x] = sTag1; } }
+        else if (p0 < 0) { p0 = pb + v4; p0bg = bg; if (g_ctSrcOn) sTag0 = owSrcTag(w, bg, col, row, chip, tx, ty, x, y); }   // priority-0 = background
       }
       // WHAT OCCLUDES THE PLAYER: only BG1's priority-1 pixels. The PPU's mode-1 stack, front to back, is
       // OBJ3 / BG1p1 / OBJ2 / BG2p1 / OBJ1 / BG1p0 / OBJ0 / BG2p0, and the lead is an OBJ of priority 2
@@ -1958,6 +1990,11 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
         }
       } else {
         dst[x * 3] = w->pal[ci][0]; dst[x * 3 + 1] = w->pal[ci][1]; dst[x * 3 + 2] = w->pal[ci][2];
+      }
+      if (g_ctSrcOn) {
+        uint32_t sTag = p1 >= 0 ? sTag1 : p0 >= 0 ? sTag0 : 0;
+        if (g_ctSrcCheck && sTag) CtSrcExpect(sTag, ci & 15);
+        CtSrcPutTag(fb, W, x, y, sTag, dst[x * 3], dst[x * 3 + 1], dst[x * 3 + 2]);
       }
     }
   }
@@ -2064,6 +2101,7 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
       int ci = fgci[y * W + x];
       if (ci < 0) continue;
       dst[x * 3] = w->pal[ci][0]; dst[x * 3 + 1] = w->pal[ci][1]; dst[x * 3 + 2] = w->pal[ci][2];
+      if (g_ctSrcOn) CtSrcPutTag(fb, W, x, y, fgTag[y * W + x], dst[x * 3], dst[x * 3 + 1], dst[x * 3 + 2]);
       mlayer[y * W + x] = 0;
     }
   }
@@ -2100,6 +2138,8 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
         if (opri[x] == 2 && (cov & 0x03)) continue;                     // OBJ2 is under BG1p1 / BG2p1
         if (opri[x] < 2 && (cov & 0x0F)) continue;                      // OBJ1 / OBJ0 under every BG1/BG2 pixel
         dst[x * 3] = w->pal[opix[x]][0]; dst[x * 3 + 1] = w->pal[opix[x]][1]; dst[x * 3 + 2] = w->pal[opix[x]][2];
+        if (g_ctSrcOn) { if (g_ctSrcCheck) CtSrcExpect(g_owObjTag[x], opix[x] & 15);
+                         CtSrcPutTag(fb, W, x, y, g_owObjTag[x], dst[x * 3], dst[x * 3 + 1], dst[x * 3 + 2]); }
         mlayer[y * W + x] = (uint8_t)((((opix[x] - 0x80) >> 4) & 7) >= 4 ? 4 : 6);   // ppu.c: OBJ palettes 0-3 never math
         if (g_mot) g_mot->own[y * W + x] = (uint8_t)(tag | (opri[x] == 3 ? CT_MOT_FRONT : 0));
       }
@@ -2130,8 +2170,10 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
         if (g_mot && (!mathBg3 || mathFix)) g_mot->own[y * W + x] = CT_MOT_CAPF;
         if (!mathBg3 || mathFix) {                    // math off for BG3 (or against the fixed colour, below): opaque
           for (int ch = 0; ch < 3; ch++) dst[x * 3 + ch] = w->pal[pb3 + v3][ch];
+          CtSrcNone(fb, W, x, y);                      // (the HD presenter's record: a cloud, not recorded)
           continue;
         }
+        CtSrcBlend(fb, W, x, y);                       // (the HD presenter's: the map under a translucent cloud)
         for (int ch = 0; ch < 3; ch++) {
           int m5 = w->pal[pb3 + v3][ch] >> 3, s5 = (subOwn ? owSubScr[((size_t)y * W + x) * 3 + ch] : dst[x * 3 + ch]) >> 3;
           int o5 = mathSub ? m5 - s5 : m5 + s5;         // $2131 bit7 = subtract
@@ -2160,6 +2202,7 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
         int inWin = (clip == 1 || clip == 2 || prevent == 1 || prevent == 2) && w->wram ? owColorWin(w->wram, hdmaEn, hwh0, hwh1, y, x - X0) : 0;
         if (clip == 3 || (clip == 1 && !inWin) || (clip == 2 && inWin)) { dst[x * 3] = dst[x * 3 + 1] = dst[x * 3 + 2] = 0; }
         if (L >= 6 || !(cgadsub & (1 << L)) || prevent == 3 || (prevent == 1 && !inWin) || (prevent == 2 && inWin)) continue;
+        CtSrcBlend(fb, W, x, y);                       // (the HD presenter's: the fixed colour over the record)
         for (int ch = 0; ch < 3; ch++) {
           int o5 = dst[x * 3 + ch] >> 3;
           o5 = mathSub ? o5 - fix[ch] : o5 + fix[ch];
@@ -2688,8 +2731,11 @@ static void hostUploadPictureAt(CtPresenter* pr, const uint8_t* fb, int w, int t
   size_t n = (size_t)w * k * CAMH * k * 3;
   if (g_hostPicN < n) { free(g_hostPic); g_hostPic = (uint8_t*)malloc(n); g_hostPicN = g_hostPic ? n : 0; }
   if (!g_hostPic) { hostUpload(pr, fb, w, CAMH); return; }
-  // the HD presenter: the field from HD art (hdpresent.c), at t or as the frame itself
-  if (hostHd() && CtFieldRasterHD(&g_motBuf[g_motIdx], &g_motBuf[g_motIdx ^ 1], fb, w, t, g_hostPic)) {
+  // the HD presenter: the field from HD art (hdpresent.c), at t or as the frame itself; any other picture from what each
+  // of its pixels was drawn from (hdsrc.h), as the frame
+  if (hostHd() && (CtFieldRasterHD(&g_motBuf[g_motIdx], &g_motBuf[g_motIdx ^ 1], fb, w, t, g_hostPic) ||
+                   CtHdRasterPicture(fb, w, g_hostPic))) {
+    CtHdHashPicture(g_hostPic, (size_t)w * k * CAMH * k * 3);   // (CT_HD_STATS: what the HD presenter drew, hashed)
     hostUpload(pr, g_hostPic, w * k, CAMH * k);
     return;
   }
@@ -2759,12 +2805,19 @@ static int hostRefreshHz(CtPresenter* pr) {
 }
 // THE HD PRESENTER (settings.h presenter, hdpresent.h; a mod): the field drawn at 4x from HD art. An interactive run's
 // option, or CT_HD_PRESENTER=1 (checks: a headless run keeps every mod off otherwise). Its art is loaded once (CT_HD_DIR).
+static long g_bugFrame;                            // (the session's frame, below)
 static int hostHd(void) {
-  static int env = -1, opened;
-  if (env < 0) { const char* e = getenv("CT_HD_PRESENTER"); env = (e && *e && *e != '0') || getenv("CT_HDCHECK");
+  static int env = -1, opened; static long envFrom = 0, envTo = -1;
+  if (env < 0) { const char* e = getenv("CT_HD_PRESENTER"); env = (e && *e && strcmp(e, "0")) || getenv("CT_HDCHECK");
+                 // CT_HD_PRESENTER=<from>-<to> (check): on over those frames only, as a player turning it on and off
+                 if (e && strchr(e, '-') && sscanf(e, "%ld-%ld", &envFrom, &envTo) != 2) envTo = -1;
                  if (getenv("CT_HDCHECK")) CtHdNearest(1); }
-  int on = env || (g_hostInteractive && CtSettingsGet()->presenter == CT_PRESENTER_HD);
+  int on = (env && (envTo < 0 || (g_bugFrame >= envFrom && g_bugFrame < envTo))) ||
+           (g_hostInteractive && CtSettingsGet()->presenter == CT_PRESENTER_HD);
   if (on && !opened) { opened = 1; CtHdOpen(NULL); }
+  if (on != g_ctSrcOn && opened) {                 // (the records follow the option: none while it is off, a clean
+    g_ctSrcOn = 1; CtSrcFrame(); g_ctSrcOn = on;   //  start when it comes back)
+  }
   return on;
 }
 static int hostInterp(CtPresenter* pr) {
@@ -2967,7 +3020,7 @@ static void hostPresentMot(CtPresenter* pr, const uint8_t* fb, int w, int motion
       }
   }
   motCheck(cur, &g_motBuf[g_motIdx ^ 1], fb, w, frameNo++);
-  if (g_hostSkipPresent) { g_hostPresentSkips++; hostUploadPictureAt(pr, fb, w, 256, 0); g_motIdx ^= 1; return; }
+  if (g_hostSkipPresent) { g_hostPresentSkips++; hostUploadPictureAt(pr, fb, w, 256, 0); g_motIdx ^= 1; CtSrcFrame(); return; }
   int interp = hostInterp(pr), presents = 0;
   if (getenv("CT_INTERP_TRACE") && atoi(getenv("CT_INTERP_TRACE")) > 1)
     fprintf(stderr, "interp: f%d valid %d t0 %.0f slot+%.1f ms\n", frameNo, cur->valid, g_hostT0,
@@ -2985,12 +3038,29 @@ static void hostPresentMot(CtPresenter* pr, const uint8_t* fb, int w, int motion
     }
   }
   if (!presents) { hostUploadPictureAt(pr, fb, w, 256, interp); hostDrawPicture(pr); CtPresentSwap(pr); presents = 1; }
+  { static const char* hs = (const char*)1; static char hsAt[2048];   // CT_HDSHOT=<prefix> with CT_HDSHOT_AT=<n>,<n>..
+    if (hs == (const char*)1) {                                         // (probe): the picture uploaded for those presents
+      hs = getenv("CT_HDSHOT");                                         //   (the internal resolution's, the HD presenter's)
+      const char* a = getenv("CT_HDSHOT_AT"); snprintf(hsAt, sizeof hsAt, ",%s,", a ? a : ""); }
+    if (hs && g_hostLastUp) {
+      char key[24]; snprintf(key, sizeof key, ",%d,", frameNo - 1);
+      if (strstr(hsAt, key)) {
+        char path[600]; snprintf(path, sizeof path, "%s_f%d.ppm", hs, frameNo - 1);
+        FILE* f = fopen(path, "wb");
+        if (f) { fprintf(f, "P6 %d %d 255 ", g_hostLastUpW, g_hostLastUpH);
+                 fwrite(g_hostLastUp, 1, (size_t)g_hostLastUpW * g_hostLastUpH * 3, f); fclose(f); }
+        int mw = 0; const uint8_t* mk = CtHdCoverMask(&mw);             // ...and which of its pixels came from HD art (PGM:
+        if (mk) { snprintf(path, sizeof path, "%s_f%d_cover.pgm", hs, frameNo - 1);   //  255 yes, 128 no, 0 black)
+                  f = fopen(path, "wb");
+                  if (f) { fprintf(f, "P5 %d 224 255 ", mw);
+                           for (int i = 0; i < mw * 224; i++) fputc(mk[i] == 1 ? 255 : mk[i] == 2 ? 128 : 0, f); fclose(f); } } } } }
   g_interpPresents += presents;
   if (++g_interpFrames % 300 == 0 && getenv("CT_INTERP_TRACE")) {
     fprintf(stderr, "interp: %.2f presents/frame, redraw %.2f ms/present (%d Hz, interp %d)\n",
             (double)g_interpPresents / 300.0, g_interpMs / (double)g_interpPresents, hostRefreshHz(pr), interp);
     g_interpPresents = 0; g_interpMs = 0; }
   g_motIdx ^= 1;                                   // the next frame records into the other one
+  CtSrcFrame();                                    // (the HD presenter's records were this frame's)
 }
 // A SPRITE ON THE SUB SCREEN ALONE (scene.c CtFieldSceneMainScreen): per screen pixel, set each frame from the bake, 1 where
 // the main screen's top layer there has colour math, and that layer's colour before the math. drawSprite adds (subtracts,
@@ -2999,11 +3069,15 @@ static void hostPresentMot(CtPresenter* pr, const uint8_t* fb, int w, int motion
 // cartridge; drawn over the mixed picture, the port's sprites hid the beams.
 static uint8_t g_objSubOn, g_objSubSub, g_objSubHalf;
 static uint8_t g_objSubMask[FIELD_WMAX * CAMH], g_objSubRgb[FIELD_WMAX * CAMH * 3];
+// THE TEXEL THE NEXT plot() SHOWS (hdsrc.h CtSrcTag; 0 = none), set by a drawer that knows it while the HD presenter
+// records (g_ctSrcOn): the pixel's record, and its sprite pixel's (CtMotFrame.spx tag). Nothing of the game reads it.
+static uint32_t g_srcTag;
 static void plot(uint8_t* fb, int x, int y, int r, int g, int b) {
   if (x >= 0 && x < g_fw && y >= 0 && y < CAMH) { size_t o = ((size_t)y * g_fw + x) * 3; fb[o] = r; fb[o + 1] = g; fb[o + 2] = b;
     if (g_bObjPalMask) g_bObjPalMask[(size_t)y * g_fw + x] = (uint8_t)(g_bObjPalCur < 0 ? 0xFF : g_bObjPalCur);
+    if (g_ctSrcOn) CtSrcPutTag(fb, g_fw, x, y, g_srcTag, r, g, b);
     if (g_mot) { g_mot->own[(size_t)y * g_fw + x] = (uint8_t)g_motOwn; int n0 = g_mot->nspx; CtMotSpritePixel(g_mot, x, y, r, g, b, g_motOwn);
-                 if (g_mot->nspx > n0) g_mot->spx[n0].pal = (uint8_t)(g_bObjPalCur < 0 ? 0xFF : g_bObjPalCur & 7); } }
+                 if (g_mot->nspx > n0) { g_mot->spx[n0].pal = (uint8_t)(g_bObjPalCur < 0 ? 0xFF : g_bObjPalCur & 7); g_mot->spx[n0].tag = g_srcTag; } } }
 }
 
 // ---- THE IRIS WINDOW: window 1 on BG1/BG2, from the ROM's own table (disasm/notes/field_iris_window.md) -----------------
@@ -3236,22 +3310,36 @@ static const uint8_t* g_tbTextCgram = NULL;
 // destroys it, and the op's completion arm C0/3635 never re-creates it -- see CtSceneTextboxUnparking).
 static int g_tbBoxes = 0, g_tbWindows = 0, g_tbReopen = 0;
 // Render a dialogue-font glyph with an explicit 3-tone palette (tone[1]=shadow, [2]=AA, [3]=body).
+// A glyph drawn at (x, y): the HD presenter's record of it (hdsrc.h; the source is its 12 x 12 tones), 0 = not recording.
+static int glyphDraw(const uint8_t* g, int x, int y) {
+  if (!g_ctSrcOn) return 0;
+  uint8_t idx[144];
+  for (int ry = 0; ry < 12; ry++) {
+    int p0 = g[ry * 4] | (g[ry * 4 + 1] << 8), p1 = g[ry * 4 + 2] | (g[ry * 4 + 3] << 8);
+    for (int rx = 0; rx < 12; rx++) idx[ry * 12 + rx] = (uint8_t)(((p0 >> (11 - rx)) & 1) | (((p1 >> (11 - rx)) & 1) << 1));
+  }
+  return CtSrcDraw(CtSrcOf(idx, 12, 12), 0, 0, x, y);
+}
 static int cDrawGlyphP(uint8_t* fb, const uint8_t* font, int gi, int x, int y, const uint8_t tone[4][3]) {
   if (gi < 0) return 5;
   const uint8_t* g = font + FONT_GLYPHS + gi * 48;
+  const int gInst = glyphDraw(g, x, y);               // (the HD presenter's record of this glyph; 0 = off)
   for (int ry = 0; ry < 12; ry++) {
     int p0 = g[ry * 4] | (g[ry * 4 + 1] << 8), p1 = g[ry * 4 + 2] | (g[ry * 4 + 3] << 8);
     if (y + ry < tbClipY0 || y + ry >= tbClipY1) continue;
     for (int rx = 0; rx < 12; rx++) {
       int bit = 11 - rx;
       int c = ((p0 >> bit) & 1) | (((p1 >> bit) & 1) << 1);
-      if (c) plot(fb, x + rx, y + ry, tone[c][0], tone[c][1], tone[c][2]);
+      if (c) { g_srcTag = gInst ? CtSrcTag(gInst, rx, ry) : 0; if (g_ctSrcCheck) CtSrcExpect(g_srcTag, c);
+               plot(fb, x + rx, y + ry, tone[c][0], tone[c][1], tone[c][2]); }
     } }
+  g_srcTag = 0;
   return cGlyphW(font, gi);
 }
 static int cDrawGlyph(uint8_t* fb, const uint8_t* font, int gi, int x, int y) {
   if (gi < 0) return 5;
   const uint8_t* g = font + FONT_GLYPHS + gi * 48;
+  const int gInst = glyphDraw(g, x, y);               // (the HD presenter's record of this glyph; 0 = off)
   // the CT glyphs are 3-tone with the drop shadow BAKED IN: colour 3 = body, colour 1 = the
   // shadow hugging each stroke's right/bottom, colour 2 = mid anti-alias. One pass, no
   // synthetic offset shadow (painting colour 1 as body was the old 'bold' look).
@@ -3272,8 +3360,10 @@ static int cDrawGlyph(uint8_t* fb, const uint8_t* font, int gi, int x, int y) {
     for (int rx = 0; rx < 12; rx++) {
       int bit = 11 - rx;
       int c = ((p0 >> bit) & 1) | (((p1 >> bit) & 1) << 1);
-      if (c) plot(fb, x + rx, y + ry, tone[c][0], tone[c][1], tone[c][2]);
+      if (c) { g_srcTag = gInst ? CtSrcTag(gInst, rx, ry) : 0; if (g_ctSrcCheck) CtSrcExpect(g_srcTag, c);
+               plot(fb, x + rx, y + ry, tone[c][0], tone[c][1], tone[c][2]); }
     } }
+  g_srcTag = 0;
   return cGlyphW(font, gi);
 }
 static int wordW(const uint8_t* font, const char* s, int i, int j) {
@@ -3374,6 +3464,25 @@ static int g_tbMathOn = 0;
 // THE FIELD WINDOW'S BG1 PIXELS: the CGRAM index of each of the window's 80 x 256 pixels (0 = transparent, the backdrop),
 // from the tiles, map and attributes fieldWindowFromRom builds (C0/6E5C, C0/29F7). g_winIdxOk once built.
 static uint8_t g_winIdx[256 * 80];
+// ...and the map C0/29F7 wrote and the tiles it names (fieldWindowFromRom): the HD presenter's record of each box pixel
+static uint16_t g_winMap[320]; static const uint8_t* g_winTiles;
+static void winRecord(uint8_t* fb, int x, int line, int wy, const uint8_t* rgb, int v) {
+  static int inst[320]; static long frame = -1;
+  long long fr = 0; CtSrcStats(&fr, NULL, NULL);
+  if (fr != frame) { memset(inst, 0, sizeof inst); frame = fr; }
+  if (!g_winTiles || (unsigned)wy >= 80u) { CtSrcNone(fb, CAMW, x, line); return; }
+  int cell = (wy >> 3) * 32 + (x >> 3);
+  uint16_t e = g_winMap[cell];
+  if (!inst[cell]) {
+    int t = e & 0x3FF, k = (t >= 0x3FC) ? 16 + (t - 0x3FC) : t - 0xF0;
+    inst[cell] = k >= 0 && k < 20 ? CtSrcDraw(CtSrcOf4bpp(g_winTiles + k * 32), ((e & 0x4000) ? 1 : 0) | ((e & 0x8000) ? 2 : 0), 0,
+                                              x & ~7, line - (wy & 7)) : -1;
+  }
+  if (inst[cell] <= 0) { CtSrcNone(fb, CAMW, x, line); return; }
+  int tx = (e & 0x4000) ? 7 - (x & 7) : (x & 7), ty = (e & 0x8000) ? 7 - (wy & 7) : (wy & 7);
+  CtSrcPut(fb, CAMW, x, line, inst[cell], tx, ty, rgb[0], rgb[1], rgb[2]);
+  if (g_ctSrcCheck) CtSrcExpect(CtSrcTag(inst[cell], tx, ty), v);
+}
 static int g_winIdxOk = 0;
 // THE FIELD BOX, AS THE PPU DRAWS IT. The window is BG1 (vscroll 956 on every box line: the rows map 1:1 onto the window's
 // tilemap rows, also while the band ramps -- the band only clips), its colours CGRAM's (the page C0/712E uploaded,
@@ -3430,6 +3539,7 @@ static int drawCtWindowPpu(uint8_t* fb, int top, int y0c, int y1c) {
         }
         dst[x * 3 + c] = (uint8_t)((v << 3) | (v >> 2));
       }
+      if (g_ctSrcOn) winRecord(fb, x, line, y, dst + x * 3, ci & 15);
     }
   }
   return 1;
@@ -3441,6 +3551,7 @@ static void drawCtWindow(uint8_t* fb, int top, int h) {
     if (y >= 0 && y >= y0c && y < y1c)                                           //  its opening band draws)
       memset(g_motBuf[g_motIdx].own + y * g_motBuf[g_motIdx].w + g_motViewX, CT_MOT_FIXED, CAMW);
   if (h == TB_H && drawCtWindowPpu(fb, top, y0c, y1c)) return;     // the field box: the PPU's own picture
+  if (g_ctSrcOn) CtSrcNoneRect(fb, CAMW, 0, top > y0c ? top : y0c, CAMW, (top + h < y1c ? top + h : y1c) - (top > y0c ? top : y0c));
   if (tbWinPx && tbWinH > 24) {
     // blit the real window: rows map 1:1 when h == native height; otherwise 9-patch rows
     // (top 12 + bottom 10 verbatim, the body sampled proportionally from the texture band)
@@ -3533,6 +3644,8 @@ static void drawCtMsgWindow24(uint8_t* fb, int top) {
         if (v5 < 0) v5 = 0; else if (v5 > 31) v5 = 31;
         dst[x * 3 + c] = (uint8_t)((v5 << 3) | (v5 >> 2));
       }
+    if (g_ctSrcOn)                                     // (the HD presenter's records: the bake row's window chips)
+      for (int x = 0; x < 256; x++) winRecord(fb, x, top + y, sy, dst + x * 3, g_winIdx[sy * 256 + x] & 15);
   }
 }
 static int pageChars(const char* s, int start, int end) {   // reveal length of a page (visible chars)
@@ -3884,14 +3997,20 @@ static int asciiToCt(char a);   // fwd: ASCII -> CT char code (defined below, vi
 static void drawFontGlyphP(const uint8_t* font, uint8_t* fb, int code, int x, int y, const uint8_t pal[4][3]) {
   if (!font) return;
   const uint8_t* g = font + (code & 0xFF) * 16;
+  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf2bpp(g), 0, 0, x, y) : 0;   // (the HD presenter's record of the glyph)
   for (int yy = 0; yy < 8; yy++) {
     int b0 = g[yy * 2], b1 = g[yy * 2 + 1];
     for (int xx = 0; xx < 8; xx++) {
       int bit = 7 - xx, v = ((b0 >> bit) & 1) | (((b1 >> bit) & 1) << 1);
       int px = x + xx, py = y + yy;
-      if (v && px >= 0 && px < CAMW && py >= 0 && py < 224) plot(fb, px, py, pal[v][0], pal[v][1], pal[v][2]);
+      if (v && px >= 0 && px < CAMW && py >= 0 && py < 224) {
+        g_srcTag = sInst ? CtSrcTag(sInst, xx, yy) : 0;
+        if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
+        plot(fb, px, py, pal[v][0], pal[v][1], pal[v][2]);
+      }
     }
   }
+  g_srcTag = 0;
 }
 static void drawMenuGlyphP(uint8_t* fb, int code, int x, int y, const uint8_t pal[4][3]) {
   drawFontGlyphP(menuFontC2 ? menuFontC2 : menuFont, fb, code, x, y, pal);
@@ -4537,7 +4656,10 @@ static int drawSprite(CtAssets* a, uint8_t* fb, uint8_t* idx, uint8_t* pal, int 
   const uint8_t* sb = CtAssetGet(a, CT_ASSET_SPRITE, (uint32_t)spr, &sl);
   int box[4];                                       // the opaque pixels' bounds: the loop below walks only them
   static uint8_t half[CT_SPR_W * CT_SPR_H];         // per pixel: its unit's priority byte (CtComposeSpriteHalves)
-  if (!sb || !CtComposeSpriteHalves(sb, sl, af, idx, pal, box, half)) return 0;
+  static uint8_t unit[CT_SPR_W * CT_SPR_H];         // ...and its chip slot, for the HD presenter's records (hdsrc.h)
+  if (!sb || !CtComposeSpriteUnits(sb, sl, af, idx, pal, box, half, g_ctSrcOn ? unit : NULL)) return 0;
+  int srcInst[96], srcX0[96], srcY0[96], srcFl[96], srcGroup = 0;   // (the records: one draw a chip slot, one group)
+  if (g_ctSrcOn) { memset(srcInst, 0, sizeof srcInst); srcGroup = CtSrcGroup(); }
   // THE SPRITE'S COLOURS ARE ITS OBJ PALETTE SLOT IN THE CGRAM SHADOW, NOT THE ASSET'S BAKED 48 BYTES.
   // The ROM draws OBJs with CGRAM, and CGRAM is fed from the WRAM shadow ($7E:2000 page; OBJ palette
   // `slot` = 16 BGR555 words at $7E:2100 + slot*32). Every writer meets there: the allocator's 24-byte
@@ -4617,6 +4739,7 @@ static int drawSprite(CtAssets* a, uint8_t* fb, uint8_t* idx, uint8_t* pal, int 
         if (px >= 0 && px < sten->cw && py >= 0 && py < sten->ch) {   // BG1/BG2 are on screen here and win
           memcpy(fb + ((size_t)py * g_fw + px) * 3,
                  sten->base + ((size_t)(sten->camY + py) * sten->W + (sten->camX + px)) * 3, 3);
+          CtSrcNone(fb, g_fw, px, py);
           if (front) front[(size_t)py * g_fw + px] = 0;
           CtMotTag(g_mot, px, py, g_motOwn);                         // (the map's pixel, the occluder's: it covers)
           CtMotSpriteHole(g_mot, px, py, g_motOwn);
@@ -4624,6 +4747,22 @@ static int drawSprite(CtAssets* a, uint8_t* fb, uint8_t* idx, uint8_t* pal, int 
         continue;
       }
       if (winClip && !win) continue;                       // clip-only (no stencil): just not drawn here
+      if (g_ctSrcOn && unit[y * CT_SPR_W + x]) {          // the HD presenter's record: the chip slot's chip and texel
+        int u = unit[y * CT_SPR_W + x] - 1;
+        if (!srcInst[u]) {
+          const uint8_t* tl; int fl, cx0, cy0;
+          srcInst[u] = -1;
+          if (CtSpriteCell(sb, sl, af, u, &tl, &fl, &cx0, &cy0)) {
+            int id = CtSrcDraw(CtSrcOf(tl, 8, 8), fl, srcGroup, sx - CT_SPR_OX + cx0, sy - CT_SPR_OY + cy0 + 1);
+            if (id) { srcInst[u] = id; srcX0[u] = cx0; srcY0[u] = cy0; srcFl[u] = fl; }
+          }
+        }
+        if (srcInst[u] > 0) {
+          int bx = x - srcX0[u], by = y - srcY0[u];
+          g_srcTag = CtSrcTag(srcInst[u], (srcFl[u] & 1) ? 7 - bx : bx, (srcFl[u] & 2) ? 7 - by : by);
+          if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
+        }
+      }
       if (g_objSubOn && px >= 0 && px < g_fw && py >= 0 && py < CAMH && g_objSubMask[(size_t)py * g_fw + px]) {
         const uint8_t* m = g_objSubRgb + ((size_t)py * g_fw + px) * 3;
         uint8_t c[3];
@@ -4636,6 +4775,7 @@ static int drawSprite(CtAssets* a, uint8_t* fb, uint8_t* idx, uint8_t* pal, int 
         plot(fb, px, py, c[0], c[1], c[2]);
       } else
       plot(fb, px, py, pal[v * 3], pal[v * 3 + 1], pal[v * 3 + 2]);
+      g_srcTag = 0;
       if (px >= 0 && px < g_fw && py >= 0 && py < CAMH) {
         nplot++;
         // The pixel that wins OBJ-vs-OBJ carries ITS priority against the BG: a priority-2 unit drawn over an
@@ -4713,6 +4853,46 @@ typedef struct {
 } Field;                          // a scene map holds many rooms -- the camera stays in THIS one
 // The canvas pixel the screen shows at map pixel (x, y): the BG tilemap repeats the map (C0/7612 `AND $1E` / `AND $1F`
 // over the metatile column and row), so a camera whose screen runs past the canvas reads the map again from its start.
+// THE HD PRESENTER'S RECORD OF A MAP PIXEL (hdsrc.h): picture pixel (x, y) shows map canvas pixel (bx, by) -- its chip is
+// the top of the main screen's layer pictures there (scene.h CtFieldSceneLayers / Cells, sampled at the bake's own layer
+// offsets: canvas pixel p shows BGn pixel p + o), each cell one draw a frame.
+static void fieldMapRecord(uint8_t* fb, int x, int y, void* sd, int bx, int by) {
+  static CtSceneLayers L; static CtSceneLayerCells C; static int o[4], ok; static long frame = -1; static void* lastSd;
+  long long fr = 0; CtSrcStats(&fr, NULL, NULL);
+  if (fr != frame || sd != lastSd) {
+    frame = fr; lastSd = sd;
+    ok = CtFieldSceneLayers(sd, &L) && CtFieldSceneLayerCells(sd, &C) && CtFieldSceneLayerOffsetsBaked(sd, &o[0], &o[1], &o[2], &o[3]);
+  }
+  if (!ok) { CtSrcNone(fb, g_fw, x, y); return; }
+  static const int lay[6] = { 2, 1, 0, 1, 0, 2 }; static const uint8_t bit[6] = { 4, 2, 1, 2, 1, 4 };
+  const uint8_t* px0 = fb + ((size_t)y * g_fw + x) * 3;
+  // the main screen's top layer there; where the main screen shows only its backdrop, the sub screen's (a room whose map
+  // is on the sub screen under BG3's light, Manoria's cathedral: the colour math shows it -- a blend over its record)
+  for (int k = 0; k < 12; k++) {
+    const int i = 5 - k % 6, sub = k >= 6;
+    if (!((sub ? L.subT : L.mainT) & bit[i]) || !L.cov[i] || L.w[i] <= 0 || L.h[i] <= 0) continue;
+    int ox = lay[i] == 1 ? o[0] : lay[i] == 2 ? o[2] : 0, oy = lay[i] == 1 ? o[1] : lay[i] == 2 ? o[3] : 0;
+    int px = (bx + ox) % L.w[i], py = (by + oy) % L.h[i];
+    if (px < 0) px += L.w[i];
+    if (py < 0) py += L.h[i];
+    if (!L.cov[i][(size_t)py * L.w[i] + px]) continue;
+    int ci = (py / 8) * C.cw[i] + px / 8;
+    const CtSceneCell* ce = &C.cell[i][ci];
+    if (ce->chip == 0xFFFF || ce->chip >= C.nchips[i]) break;
+    uint32_t key = CT_SRC_KEY(3 + i, ci);
+    int inst = CtSrcCellFind(key);
+    int tx = (ce->flags & 1) ? 7 - (px & 7) : (px & 7), ty = (ce->flags & 2) ? 7 - (py & 7) : (py & 7);
+    if (!inst) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf(C.chips[i] + (size_t)ce->chip * 64, 8, 8), ce->flags, 0, x - (px & 7), y - (py & 7)));
+    CtSrcPut(fb, g_fw, x, y, inst, tx, ty, px0[0], px0[1], px0[2]);
+    if (sub) CtSrcBlend(fb, g_fw, x, y);
+    if (g_ctSrcCheck) {                                // (the record's chip, in its colours, is the layer picture's pixel)
+      int v = C.chips[i][(size_t)ce->chip * 64 + ty * 8 + tx];
+      CtSrcExpectTrue(v && !memcmp(C.pal[ce->base + v], L.rgb[i] + ((size_t)py * L.w[i] + px) * 3, 3));
+    }
+    return;
+  }
+  CtSrcNone(fb, g_fw, x, y);
+}
 static inline size_t fieldBaseAt(const Field* f, int x, int y) {
   x %= f->W; if (x < 0) x += f->W;
   y %= f->H; if (y < 0) y += f->H;
@@ -5644,6 +5824,7 @@ static void fieldWindowFromRom(const uint8_t* s) {
     }
   }
   tbWinPx = g_winRom; tbWinH = 80; tbWinGen++; g_winRomColour = v; g_winIdxOk = 1;
+  memcpy(g_winMap, map, sizeof g_winMap); g_winTiles = tl;      // (the HD presenter's records: winRecord)
 }
 // C0/7084 and C0/70E9 ARE TWO STEPS, AND THE LOCATION'S SCRIPTS RUN BETWEEN THEM. C0/7084 is the load's C0/00F4 leg
 // (0100 JSR, and the menu reload's 01C9); C0/70E9 -- the text palette, the fixed words and the whole-page copy to the live
@@ -7075,6 +7256,14 @@ static void battleHudRenderStrip(uint8_t* fb, const uint8_t* mem, const uint8_t*
         int ci = p ? ((w >> 10) & 7) * 16 + p : 0;
         int cw = mem[0x2200 + ci * 2] | (mem[0x2201 + ci * 2] << 8);
         uint8_t op = mathOp[ry], rgb[3];
+        if (g_ctSrcOn) {                               // (the HD presenter's record: the cell's window tile)
+          uint32_t key = CT_SRC_KEY(1, (bottom << 16) | ((ry >> 3) << 8) | col);
+          int inst = CtSrcCellFind(key);
+          if (!inst) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf4bpp(winTiles + k * 32), ((w & 0x4000) ? 1 : 0) | ((w & 0x8000) ? 2 : 0), 0,
+                                                       col * 8, y - (ry & 7)));
+          g_srcTag = CtSrcTag(inst, tx, ty);
+          if (g_ctSrcCheck) CtSrcExpect(g_srcTag, p);
+        }
         for (int c = 0; c < 3; c++) {
           int c5 = (cw >> (5 * c)) & 0x1F;
           if (op & (p ? 0x01 : 0x20)) {
@@ -7085,6 +7274,7 @@ static void battleHudRenderStrip(uint8_t* fb, const uint8_t* mem, const uint8_t*
           rgb[c] = (uint8_t)((c5 << 3) | (c5 >> 2));
         }
         plot(fb, x, y, rgb[0], rgb[1], rgb[2]);
+        g_srcTag = 0;
       }
     }
   }
@@ -7122,7 +7312,16 @@ static void battleHudRenderStrip(uint8_t* fb, const uint8_t* mem, const uint8_t*
       int v = ((g[fy * 2] >> bit) & 1) | (((g[fy * 2 + 1] >> bit) & 1) << 1);
       if (!v) continue;
       const uint8_t* c = pal8[(w >> 10) & 7][v];
+      if (g_ctSrcOn) {                                 // (the HD presenter's record: the cell's glyph)
+        uint32_t key = CT_SRC_KEY(2, (bottom << 16) | (row << 8) | (bx >> 3));
+        int inst = CtSrcCellFind(key);
+        if (!inst) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf2bpp(g), ((w & 0x4000) ? 1 : 0) | ((w & 0x8000) ? 2 : 0), 0,
+                                                     x - (bx & 7), y - fine));
+        g_srcTag = CtSrcTag(inst, 7 - bit, fy);
+        if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
+      }
       plot(fb, x, y, c[0], c[1], c[2]);
+      g_srcTag = 0;
     }
   }
 }
@@ -7716,6 +7915,8 @@ static void battleBlitCell(uint8_t* fb, const uint8_t (*tiles)[32], int ntile, i
       int ti = tile + cx + 0x10 * cy;
       if (ti < 0 || ti >= ntile) continue;
       const uint8_t* t = tiles[ti];
+      const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf4bpp(t), (hf ? 1 : 0) | (vf ? 2 : 0), 0,
+                                              bx + (hf ? 8 - cx * 8 : cx * 8), by + (vf ? 8 - cy * 8 : cy * 8)) : 0;   // (the HD presenter's)
       for (int yy = 0; yy < 8; yy++) {
         int p0 = t[yy*2], p1 = t[yy*2+1], p2 = t[16+yy*2], p3 = t[16+yy*2+1];
         for (int xx = 0; xx < 8; xx++) {
@@ -7726,6 +7927,8 @@ static void battleBlitCell(uint8_t* fb, const uint8_t (*tiles)[32], int ntile, i
           if (hf) sx = 15 - sx;
           if (vf) sy = 15 - sy;
           uint16_t w = palw[v];
+          g_srcTag = sInst ? CtSrcTag(sInst, xx, yy) : 0;
+          if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
           plot(fb, bx + sx, by + sy,
                ((w&31)<<3)|((w&31)>>2),
                (((w>>5)&31)<<3)|(((w>>5)&31)>>2),
@@ -7733,6 +7936,7 @@ static void battleBlitCell(uint8_t* fb, const uint8_t (*tiles)[32], int ntile, i
         }
       }
     }
+  g_srcTag = 0;
 }
 
 // D2 (defect: "the enemy is not flashing white when taking the attack"): the hurt-flash pal4 white swap
@@ -9006,6 +9210,7 @@ static void battleMarleAttackRender(uint8_t* fb, const uint8_t* mem, const CtBat
 // One 8x8 4bpp OBJ tile blit at (x,y), palette = ctBattleFxDigitPal (OBJ pal0, shared by the damage digits
 // AND the "MISS" glyph -- both are pal0, battle_actionfx.md P1.1 / battle_miss_evade.md §2). idx 0 = clear.
 static void battleFxBlitTile(uint8_t* fb, const uint8_t* t, int x, int y, const uint16_t* pal) {
+  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf4bpp(t), 0, 0, x, y) : 0;   // (the HD presenter's record)
   for (int yy = 0; yy < 8; yy++) {
     int b0 = t[yy * 2], b1 = t[yy * 2 + 1], b2 = t[16 + yy * 2], b3 = t[16 + yy * 2 + 1];
     for (int xx = 0; xx < 8; xx++) {
@@ -9013,12 +9218,15 @@ static void battleFxBlitTile(uint8_t* fb, const uint8_t* t, int x, int y, const 
       int v4 = ((b0 >> bit) & 1) | (((b1 >> bit) & 1) << 1) | (((b2 >> bit) & 1) << 2) | (((b3 >> bit) & 1) << 3);
       if (v4 == 0) continue;                          // CGRAM index 0 = transparent
       uint16_t w = pal[v4];                            // OBJ pal0 (damage/MISS) or pal4 (restore), per $AD9E
+      g_srcTag = sInst ? CtSrcTag(sInst, xx, yy) : 0;
+      if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v4);
       plot(fb, x + xx, y + yy,
            ((w & 31) << 3) | ((w & 31) >> 2),
            (((w >> 5) & 31) << 3) | (((w >> 5) & 31) >> 2),
            (((w >> 10) & 31) << 3) | (((w >> 10) & 31) >> 2));
     }
   }
+  g_srcTag = 0;
 }
 static void battleFxPopupsRender(uint8_t* fb, const CtBattleHost* h) {
   if (!h) return;
@@ -9083,6 +9291,7 @@ static void battleFxDrawOam(uint8_t* fb, const CtBattleHost* h, int x, int y, in
   int pal = (attr >> 1) & 7, page = attr & 1;
   int hf = (attr & 0x40) != 0, vf = (attr & 0x80) != 0;
   int keepPal = g_bObjPalCur; g_bObjPalCur = pal;                   // the entry's own palette (the sprites' colour math)
+  int sInst[4] = { 0, 0, 0, 0 };                                    // (the HD presenter's: a draw per 8x8 cell)
   for (int r = 0; r < size; r++) {
     int fy = (y + r) & 0xFF;
     if (fy >= CAMH) continue;
@@ -9094,6 +9303,12 @@ static void battleFxDrawOam(uint8_t* fb, const CtBattleHost* h, int x, int y, in
       long b1 = (word + (row & 7) - 0x0C00) * 2, b2 = (word + 8 + (row & 7) - 0x0C00) * 2;
       if (b1 < 0 || b2 + 1 >= (long)sizeof h->fxObjChr) continue;
       int pl1 = h->fxObjChr[b1] | (h->fxObjChr[b1 + 1] << 8), pl2 = h->fxObjChr[b2] | (h->fxObjChr[b2 + 1] << 8);
+      const int cell = (row / 8) * 2 + col / 8;
+      if (g_ctSrcOn && cell < 4 && !sInst[cell]) {
+        long t0 = (word - 0x0C00) * 2;                                // (the cell's 32 bytes: planes 0/1, then 2/3)
+        sInst[cell] = t0 >= 0 && t0 + 32 <= (long)sizeof h->fxObjChr
+                    ? CtSrcDraw(CtSrcOf4bpp(h->fxObjChr + t0), (hf ? 1 : 0) | (vf ? 2 : 0), 0, x + col, fy - (vf ? 7 - (row & 7) : (row & 7))) : -1;
+      }
       for (int px = 0; px < 8; px++) {
         int sh = hf ? px : 7 - px;
         int v = ((pl1 >> sh) & 1) | (((pl1 >> (8 + sh)) & 1) << 1) | (((pl2 >> sh) & 1) << 2) | (((pl2 >> (8 + sh)) & 1) << 3);
@@ -9102,8 +9317,11 @@ static void battleFxDrawOam(uint8_t* fb, const CtBattleHost* h, int x, int y, in
         if (sx < 0 || sx >= CAMW) continue;
         int ci = 128 + 16 * pal + v;
         uint16_t w = (uint16_t)(h->fxCgram[ci * 2] | (h->fxCgram[ci * 2 + 1] << 8));
+        g_srcTag = cell < 4 && sInst[cell] > 0 ? CtSrcTag(sInst[cell], hf ? 7 - px : px, row & 7) : 0;
+        if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
         plot(fb, sx, fy, ((w & 31) << 3) | ((w & 31) >> 2), (((w >> 5) & 31) << 3) | (((w >> 5) & 31) >> 2),
              (((w >> 10) & 31) << 3) | (((w >> 10) & 31) >> 2));
+        g_srcTag = 0;
       }
     }
   }
@@ -10144,18 +10362,21 @@ static void fieldWideAssemble(uint8_t* out, const uint8_t* wpic, const uint8_t* 
     if (bright <= 0 || (blank && y >= 211)) memset(o, 0, (size_t)w * 3);
     else if (bright >= 15) memcpy(o, s, (size_t)w * 3);
     else for (int i = 0; i < w * 3; i++) o[i] = (uint8_t)(s[i] * bright / 15);
+    CtSrcCopyRow(out, w, 0, y, wpic, w, 0, y, w);    // (the HD presenter's records go with the pixels: the wide picture's...)
     if (g_wipeOn[y] && !(blank && y >= 211) && bright > 0) {
       int l = g_wipeL[y], r = g_wipeR[y], L = wideWipeEdge(l, w), R = wideWipeEdge(r, w);
       uint8_t bdd[3]; for (int c = 0; c < 3; c++) bdd[c] = (uint8_t)(bright >= 15 ? g_wipeBd[c] : g_wipeBd[c] * bright / 15);
       for (int x = 0; x < w; x++) {
         int masked = x >= L && x <= R, vx = x - x0;
-        if (masked) { memcpy(o + x * 3, bdd, 3); if (m && m->w == w) m->own[y * w + x] = CT_MOT_FIXED; }
-        else if (vx >= 0 && vx < CAMW && !(vx >= l && vx <= r)) memcpy(o + x * 3, view + ((size_t)y * CAMW + vx) * 3, 3);
+        if (masked) { memcpy(o + x * 3, bdd, 3); if (m && m->w == w) m->own[y * w + x] = CT_MOT_FIXED; CtSrcNone(out, w, x, y); }
+        else if (vx >= 0 && vx < CAMW && !(vx >= l && vx <= r)) { memcpy(o + x * 3, view + ((size_t)y * CAMW + vx) * 3, 3);
+                                                                   CtSrcCopyRow(out, w, x, y, view, CAMW, vx, y, 1); }
         // (else: the picture's own pixel, already in o -- a side, or a view pixel the view had masked)
       }
       continue;
     }
-    if (xc == x0) { memcpy(o + (size_t)x0 * 3, view + (size_t)y * CAMW * 3, (size_t)CAMW * 3); continue; }
+    if (xc == x0) { memcpy(o + (size_t)x0 * 3, view + (size_t)y * CAMW * 3, (size_t)CAMW * 3);
+                    CtSrcCopyRow(out, w, x0, y, view, CAMW, 0, y, CAMW); continue; }   // (...and the view's)
     const uint8_t* v = view + (size_t)y * CAMW * 3; const uint8_t* p = wpic + ((size_t)y * w + x0) * 3;
     // A view pixel is screen-fixed when an overlay recorded it so (the box: drawCtWindow's CT_MOT_FIXED at the view's
     // place) or, for the overlays that record nothing, when it differs from the world's pixel there. By colour alone a
@@ -10168,18 +10389,23 @@ static void fieldWideAssemble(uint8_t* out, const uint8_t* wpic, const uint8_t* 
       int same = !(fo && fo[vx] == CT_MOT_FIXED);
       for (int c = 0; c < 3 && same; c++) { int e = bright >= 15 ? p[vx * 3 + c] : bright <= 0 ? 0 : p[vx * 3 + c] * bright / 15;
                                             if (e != v[vx * 3 + c]) same = 0; }
-      if (same) memcpy(o + ((size_t)x0 + vx) * 3, v + vx * 3, 3);
+      if (same) { memcpy(o + ((size_t)x0 + vx) * 3, v + vx * 3, 3); CtSrcCopyRow(out, w, x0 + vx, y, view, CAMW, vx, y, 1); }
     }
     for (int vx = 0; vx < CAMW; vx++) {              // (...then the screen-fixed ones at the middle)
       int same = !(fo && fo[vx] == CT_MOT_FIXED);
       for (int c = 0; c < 3 && same; c++) { int e = bright >= 15 ? p[vx * 3 + c] : bright <= 0 ? 0 : p[vx * 3 + c] * bright / 15;
                                             if (e != v[vx * 3 + c]) same = 0; }
-      if (!same) { memcpy(o + ((size_t)xc + vx) * 3, v + vx * 3, 3);
+      if (!same) { memcpy(o + ((size_t)xc + vx) * 3, v + vx * 3, 3); CtSrcCopyRow(out, w, xc + vx, y, view, CAMW, vx, y, 1);
                    if (m && m->w == w) m->own[y * w + xc + vx] = CT_MOT_FIXED; }
     }
   }
 }
 extern int g_ctLogicalHoldApu;                   // snes/snes.c: the APU through a logical-frame hold
+static int g_bugTouchDown = 0;                     // the DualSense's touchpad button is down (its events)
+// A modal loop (the F1 overlay, the bug panel) has closed. It took the fingers and the controller's events -- the
+// touchpad button's release and an unplug among them -- so nothing it held stays held: the touch pad, and the
+// touchpad's hold toward a report, start over.
+static void hostModalClosed(void) { g_hostInOptions = 0; CtTouchPadReset(); g_bugTouchDown = 0; }
 // The F1 overlay, modal: draws the paused picture and the options until the player closes them; 1 = leave the game.
 static int fieldOptionsModal(CtPresenter* pr, SDL_AudioDeviceID dev) {
   if (dev) SDL_PauseAudioDevice(dev, 1);
@@ -10211,7 +10437,7 @@ static int fieldOptionsModal(CtPresenter* pr, SDL_AudioDeviceID dev) {
   CtMacTakeSettingsRequest(); // Already-open Settings commands must not reopen it on close.
 #endif
   CtSettingsSave();
-  g_hostInOptions = 0; CtTouchPadReset();
+  hostModalClosed();
   g_hostCursorMoveMs = SDL_GetTicks();               // the cursor's idle time starts at the close
   g_hostT0 = -1.0; g_hostFrames = 0;                 // the pause is not a stall to catch up on
   if (dev) { SDL_ClearQueuedAudio(dev); SDL_PauseAudioDevice(dev, 0); }
@@ -10225,7 +10451,6 @@ static int fieldOptionsModal(CtPresenter* pr, SDL_AudioDeviceID dev) {
 static long g_bugFrame = 0;                        // the session's frame: the main loop's passes since it started
 static SDL_Joystick* g_bugPad = NULL;              // CT_BUGPAD (test): the virtual controller the probe drives
 static int g_bugPlay = 0;                          // CT_PLAYINPUT: this run's input is a log's, not SDL's
-static int g_bugTouchDown = 0;                     // the DualSense's touchpad button is down (its events)
 static uint16_t g_bugHeldMask = 0;                 // the buttons held as the panel closed (Enter is Start's key): kept
                                                    //   from the game until they are let go
 // The 256x224 picture the game composed last: the middle 256 columns of a widescreen one, which are the vanilla picture
@@ -10262,19 +10487,24 @@ static void hostBugOptions(CtPresenter* pr, char* o, size_t n) {
   for (char* q = nm; *q; q++) if (*q == '"' || *q == '\\' || (unsigned char)*q < 0x20) *q = '\'';
   snprintf(o, n, "\"interactive\": %d, \"presenter\": \"%s\", \"backend\": %d, \"window\": [%d, %d], \"fullscreen\": %d, "
                  "\"widescreen\": %d, \"picture_width\": %d, \"render_scale\": %d, \"frames_between\": %d, \"scale_mode\": %d, "
-                 "\"aspect\": %d, \"filter\": %d, \"vsync\": %d, \"sync\": \"%s\", \"instant_uploads\": %d",
+                 "\"aspect\": %d, \"filter\": %d, \"vsync\": %d, \"sync\": \"%s\", \"instant_uploads\": %d, "
+                 "\"hd_presenter\": %d",
            g_hostInteractive, nm, st->backend, ow, oh, st->fullscreen, st->widescreen, hostWideW(), st->renderScale,
            st->interpolate, st->scaleMode, st->aspect, st->linearFilter, st->vsync,
-           st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads);
+           st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads,
+           g_ctSrcOn);                                 // (the HD presenter drew this frame: its records are on, hdsrc.h)
 }
 // An option the overlay changed, in the log: the ones that change the game's timing (free sync, instant uploads) make
 // the session's replay approximate from there -- a headless replay runs neither.
 static void hostBugOptionsChanged(const CtSettings* before) {
   const CtSettings* st = CtSettingsGet();
   if (before->sync == st->sync && before->instantUploads == st->instantUploads && before->widescreen == st->widescreen &&
-      before->renderScale == st->renderScale && before->interpolate == st->interpolate) return;
-  CtBugEvent(!(hostSyncFree() || hostSoundInstant()), "option sync=%s instant_uploads=%d widescreen=%d render_scale=%d frames_between=%d",
-             st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads, st->widescreen, st->renderScale, st->interpolate);
+      before->renderScale == st->renderScale && before->interpolate == st->interpolate && before->presenter == st->presenter)
+    return;
+  CtBugEvent(!(hostSyncFree() || hostSoundInstant()),
+             "option sync=%s instant_uploads=%d widescreen=%d render_scale=%d frames_between=%d presenter=%s",
+             st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads, st->widescreen, st->renderScale, st->interpolate,
+             st->presenter == CT_PRESENTER_HD ? "hd" : "vanilla");
 }
 // The panel, modal like the options (fieldOptionsModal): 1 = save, 0 = cancelled, -1 = the window closed.
 static int fieldBugModal(CtPresenter* pr, SDL_AudioDeviceID dev, char* note, int noteN, int* cat) {
@@ -10316,7 +10546,7 @@ static int fieldBugModal(CtPresenter* pr, SDL_AudioDeviceID dev, char* note, int
     if (!CtSettingsGet()->vsync || g_noPace) SDL_Delay(g_noPace ? 1 : 16);
     if (ty && n > 600) { fprintf(stderr, "[bugreport] the panel took no answer in 600 frames\n"); r = -1; }
   }
-  g_hostInOptions = 0; CtTouchPadReset();
+  hostModalClosed();
   g_hostCursorMoveMs = SDL_GetTicks();
   g_hostT0 = -1.0; g_hostFrames = 0;                 // the pause is not a stall to catch up on
   if (dev) { SDL_ClearQueuedAudio(dev); SDL_PauseAudioDevice(dev, 0); }
@@ -10482,6 +10712,7 @@ int main(int argc, char** argv) {
       CtAssetsClose(&la);
       return 0;
     }
+    if (!strcmp(argv[i], "--hdsrctest")) return CtSrcSelfTest() ? 0 : 1;   // the HD presenter's records' contract (hdsrc.h)
     if (!strcmp(argv[i], "--hdautopass") && i + 1 < argc) {   // the HD presenter's automatic pass (hdpresent.h)
       CtAssets ha;
       if (!datpath || !CtAssetsOpen(&ha, datpath)) { printf("hdautopass: FAIL no assets (--assets before --hdautopass)\n"); return 1; }
@@ -11930,6 +12161,10 @@ int main(int argc, char** argv) {
     // the way a player's does (SDL's controller state and its button events), not from CT_PLAYINPUT. CT_BUGPAD_HOLD=
     // <mask>@<from>:<frames>,... holds more buttons (the LakeSnes word) over those frames.
     const char* bp = getenv("CT_BUGPAD");
+#if !SDL_VERSION_ATLEAST(2, 24, 0)
+    if (bp && *bp) { printf("bugreport-pad: FAIL SDL %d.%d.%d has no virtual controller (2.24)\n", SDL_MAJOR_VERSION,
+                            SDL_MINOR_VERSION, SDL_PATCHLEVEL); fflush(stdout); return 2; }
+#else
     if (bp && *bp) {
       char err[400];
       SDL_VirtualJoystickDesc vd; memset(&vd, 0, sizeof vd);
@@ -11940,6 +12175,7 @@ int main(int argc, char** argv) {
       if (vi < 0 || !(g_bugPad = SDL_JoystickOpen(vi)) || !CtBugPlayOpen(bp, err, sizeof err)) {
         printf("bugreport-pad: FAIL %s\n", vi < 0 || !g_bugPad ? SDL_GetError() : err); fflush(stdout); return 2; }
     }
+#endif
     fieldPadOpen();
     if (g_bugPad) printf("bugreport-pad: a virtual controller, %s, %s\n", SDL_IsGameController(0) ? "a game controller" : "NOT a game controller",
                          g_pad ? SDL_GameControllerName(g_pad) : "not opened");
@@ -12567,7 +12803,8 @@ int main(int argc, char** argv) {
         if (e.cbutton.button == SDL_CONTROLLER_BUTTON_GUIDE && CtOverlayAvailable()) { optionsReq = 1; continue; }
         // the DualSense's touchpad button, held a second: a bug report at once (the reporter's block, below). Unbound in
         // the game by default -- Create, the other free-looking button, is the SNES's Select.
-        if (e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD) g_bugTouchDown = 1;
+        if (e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD && !fieldPadButtonOf(SDL_CONTROLLER_BUTTON_TOUCHPAD))
+          g_bugTouchDown = 1;                        // (bound to a button of the game: it is that button)
         uint16_t pb = fieldPadButtonOf(e.cbutton.button);   // the same edges a key gives (below)
         if (pb & PAD_A) { talkPressed = 1; nmType = 1; }
         if (pb & PAD_UP) upPressed = 1;
@@ -12674,6 +12911,25 @@ int main(int argc, char** argv) {
         if (rc && *rc) { char err[400];
           if (!CtBugCheckOpen(rc, &bugCheckAt, err, sizeof err)) { printf("bugreport-replay: FAIL %s\n", err); fflush(stdout); return 2; } }
       }
+      if (g_ctSrcOn) CtHdCoverMode(battlePhase ? CT_HDM_BATTLE : menuPhase ? CT_HDM_MENU : inWorld ? CT_HDM_OVERWORLD :
+                                   f.vm ? CT_HDM_FIELD : CT_HDM_OTHER);   // (the HD presenter's coverage, by mode)
+      // CT_FRAMEHASH=<file> (check): every frame, before its input, the engine's state as it stands -- the picture the
+      // frame before composed (256x224; the middle of a wider one), the 128 KB of work RAM and the 8 KB battery -- a line
+      // each: `<frame> <picture fnv> <wram fnv> <battery fnv>`. Two runs that differ only in how they are presented write the same file (the
+      // remaster's render-independence check, its Gate 2). Read-only.
+      { static FILE* fh = (FILE*)1;
+        if (fh == (FILE*)1) { const char* e = getenv("CT_FRAMEHASH"); fh = e && *e ? fopen(e, "w") : NULL; }
+        if (fh) {
+          static uint8_t nat[CAMW * CAMH * 3];
+          hostNativePicture(nat);
+          const uint8_t* wr = CtWramSys(fieldWram());
+          uint32_t hp = 2166136261u, hw = 2166136261u, hs = 2166136261u;
+          for (size_t i = 0; i < sizeof nat; i++) { hp ^= nat[i]; hp *= 16777619u; }
+          for (size_t i = 0; i < 0x20000; i++) { hw ^= wr[i]; hw *= 16777619u; }
+          for (size_t i = 0; i < sizeof g_sram; i++) { hs ^= g_sram[i]; hs *= 16777619u; }   // (and the battery)
+          fprintf(fh, "%ld %08X %08X %08X\n", g_bugFrame, hp, hw, hs);
+          if (g_bugFrame % 600 == 0) fflush(fh);
+        } }
       if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {
         static uint8_t nat[CAMW * CAMH * 3];
         hostNativePicture(nat);
@@ -19875,6 +20131,12 @@ int main(int argc, char** argv) {
     for (int y = 0; y < ch; y++)
       for (int x = 0; x < cw; x++)
         memcpy(fb + ((size_t)y * g_fw + x) * 3, f.base + fieldBaseAt(&f, camx + x + arenaD[y * 4], camy + y + arenaD[y * 4 + 1]) * 3, 3);
+    if (g_ctSrcOn && f.sd)                             // the HD presenter's records of the map (a battle's arena)
+      for (int y = 0; y < ch; y++)
+        for (int x = 0; x < cw; x++) {
+          size_t bi = fieldBaseAt(&f, camx + x + arenaD[y * 4], camy + y + arenaD[y * 4 + 1]);
+          fieldMapRecord(fb, x, y, f.sd, (int)(bi % (size_t)f.W), (int)(bi / (size_t)f.W));
+        }
     { int be = 0, so = 0, hf = 0, mw = 0, mh = 0;           // a sprite on the sub screen alone (g_objSubOn, drawSprite)
       const uint8_t* mainPre = f.sd ? CtFieldSceneMainScreen(f.sd, &be, &so, &hf) : NULL;
       const uint8_t* mcov = f.sd ? CtFieldSceneCoverage(f.sd, &mw, &mh) : NULL;
@@ -20517,6 +20779,7 @@ int main(int argc, char** argv) {
           if (bgWinAt(x, y)) continue;                     // inside the iris -> BG1/BG2 windowed off
           uint8_t* d = fb + ((size_t)y * g_fw + x) * 3;
           if (showPrio) { d[0] = 255; d[1] = 0; d[2] = 0; } else memcpy(d, f.base + bo * 3, 3);
+          if (g_ctSrcOn && f.sd) fieldMapRecord(fb, x, y, f.sd, (int)(bo % (size_t)f.W), (int)(bo / (size_t)f.W));
           mot->own[(size_t)y * g_fw + x] = (uint8_t)CtMotMapOwner(motCov ? motCov[bo] : 1, 1);   // the map's foreground
           if (g_colWinOn || g_colObjMath) colObjPal[(size_t)y * g_fw + x] = 0xFF;   // a BG pixel again (the colour math)
         }
@@ -20839,6 +21102,7 @@ int main(int argc, char** argv) {
             if (objPrio[y * CAMW + x] == 3) continue;
             if (bgWinAt(x, y)) continue;
             memcpy(fb + ((size_t)y * CAMW + x) * 3, f.base + bo * 3, 3);
+            if (g_ctSrcOn && f.sd) fieldMapRecord(fb, x, y, f.sd, (int)(bo % (size_t)f.W), (int)(bo / (size_t)f.W));
             objPal[y * CAMW + x] = 0xFF;                 // the BG tile is on top here, not the sprite
           }
       if ((prioKept || prioCovered) && getenv("CT_BATTLE_PRIOTRACE"))
@@ -21200,6 +21464,7 @@ int main(int argc, char** argv) {
           memcpy(g_wide + (size_t)y * g_seqWideW * 3, g_seqWide + (size_t)y * g_seqWideW * 3, (size_t)g_seqWideW * 3);
           memcpy(g_wide + ((size_t)y * g_seqWideW + sx0) * 3, fb + (size_t)y * CAMW * 3, (size_t)CAMW * 3);
         }
+        CtSrcShows(g_wide, g_seqWideW, fb, CAMW, sx0);
         shown = g_wide; shownW = g_seqWideW;
       } else if (g_bwW > CAMW && battlePhase && !gwN && !(seqId >= 0 && seqOpen != 0)) {   // the widescreen battle: the
         const int bbr = (battleInidisp & 0x80) ? 0 : (battleInidisp & 0x0F);                     //   arena's sides round the view
@@ -21225,6 +21490,7 @@ int main(int argc, char** argv) {
           }
         }
         shown = g_wide; shownW = g_bwW;
+        CtSrcShows(g_wide, g_bwW, fb, CAMW, g_bwXc);
         if (fieldBlank) memset(g_wide + (size_t)211 * g_bwW * 3, 0, (size_t)(CAMH - 211) * g_bwW * 3);   // (the IRQ's blank lines)
         if (mot->valid && mot->w == CAMW && g_bwW <= CT_MOT_W) {   // ...and its owners, as wide: the sides are the arena
           static uint8_t bwCanvas[FIELD_WMAX * CAMH * 3], ownV[CAMW * CAMH];

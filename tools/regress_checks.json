@@ -47130,7 +47130,7 @@
         "Chrono_Trigger_USA_SNES.sfc"
       ],
       "expect": [
-        "snd-machine: quick: 411 runs (58 with sound), PCM identical in 411 / 411 (27246282 samples), stdout identical in 411 / 411"
+        "snd-machine: quick: 413 runs (58 with sound), PCM identical in 413 / 413 (27246282 samples), stdout identical in 413 / 413"
       ],
       "pin": [
         "^snd-machine: "
@@ -47368,14 +47368,14 @@
         "tools/third_party_saves.json"
       ],
       "expect": [
-        "input-provenance: 629 check(s) read 239 state file(s): 228 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
+        "input-provenance: 630 check(s) read 239 state file(s): 228 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
       ],
       "pin": [
         "^input-provenance: \\d+ check"
       ],
       "timeout_s": 60,
       "note_pass": "every state file a check reads comes from a recipe (tools/fixtures/, made from the ROM), a public source (tools/third_party_saves.json, verified by SHA-256) or the shrinking list of the owner's captures still waiting for their recipes (tools/private_captures.json): no check depends on a file that exists on one machine only and is not on that list",
-      "notes": "2026-10-22, the owner: nothing may depend exclusively on one machine. The suite on a fresh clone (the cloud sessions) SKIPs every check whose input is not there -- before this, 336 of 952 checks, and the number grew because nothing stopped a new check pinned on a local capture. This check fails on such a check (UNCLASSIFIED: give it a recipe or a public source) and on a list entry no check reads (STALE). Re-pin only when the private count goes DOWN (a check moved onto a recipe-made twin, docs/ROADMAP.md 1.1) or the recipe / third-party counts change with it. RE-PINNED 2026-10-22 (the attract family): saves/attract_cena_inicial.state, attract_loc0AD_flea.state, attract_race_handoff_rule_f8247.state and attract_entry3_handoff_rule_f8859.state are off the private list -- their checks read the recipe-made twins of tools/fixtures/attract_rule.json (and attract.json's attract_entry3_handoff_f6750.state) -- so 115 -> 119 recipe files, 113 -> 109 private captures, 324 -> 277 checks still on one (47 checks read no private capture any more; slot1-runner and the HDMA census keep other families' captures). || RE-PINNED 2026-10-22 (recipes-rest): saves/field_re/magus_scene.lakewram and magus_scene_lake.state made by tools/recipes/fxr_magus_scene.json and taken off tools/private_captures.json -- the rest family has no private capture left; on the merged main: 225 made by recipes, 3 private (other families' catedral_party3 and pre_scene_19f) read by 3 checks. RE-PINNED 2026-10-22 (the five recipe families merged with 4bdb397, graded in a clean-room clone -- setup from the ROM, the public saves fetched, every fixture made by its recipe): after all five families: 2 private captures left (pre_scene_19f, read by 2 checks), 226 states made by recipes, 11 public battery saves. ==== 2026-10-23, RE-PINNED DOWN TO ZERO (the late game's last two): saves/field_re/pre_scene_19f.* is made by the recipe lg_ocean_palace_19f (Jackie's ch22 played through the Ocean Palace to the aftermath; ocean-palace-aftermath-chain-vs-oracle and ow-1f5-wave-and-light-vs-oracle pass on it with their pins unchanged). No check reads a private capture any more: tools/private_captures.json is empty, and any new check on a local capture fails here as UNCLASSIFIED."
+      "notes": "2026-10-22, the owner: nothing may depend exclusively on one machine. The suite on a fresh clone (the cloud sessions) SKIPs every check whose input is not there -- before this, 336 of 952 checks, and the number grew because nothing stopped a new check pinned on a local capture. This check fails on such a check (UNCLASSIFIED: give it a recipe or a public source) and on a list entry no check reads (STALE). Re-pin only when the private count goes DOWN (a check moved onto a recipe-made twin, docs/ROADMAP.md 1.1) or the recipe / third-party counts change with it. RE-PINNED 2026-10-22 (the attract family): saves/attract_cena_inicial.state, attract_loc0AD_flea.state, attract_race_handoff_rule_f8247.state and attract_entry3_handoff_rule_f8859.state are off the private list -- their checks read the recipe-made twins of tools/fixtures/attract_rule.json (and attract.json's attract_entry3_handoff_f6750.state) -- so 115 -> 119 recipe files, 113 -> 109 private captures, 324 -> 277 checks still on one (47 checks read no private capture any more; slot1-runner and the HDMA census keep other families' captures). || RE-PINNED 2026-10-22 (recipes-rest): saves/field_re/magus_scene.lakewram and magus_scene_lake.state made by tools/recipes/fxr_magus_scene.json and taken off tools/private_captures.json -- the rest family has no private capture left; on the merged main: 225 made by recipes, 3 private (other families' catedral_party3 and pre_scene_19f) read by 3 checks. RE-PINNED 2026-10-22 (the five recipe families merged with 4bdb397, graded in a clean-room clone -- setup from the ROM, the public saves fetched, every fixture made by its recipe): after all five families: 2 private captures left (pre_scene_19f, read by 2 checks), 226 states made by recipes, 11 public battery saves. ==== 2026-10-23, RE-PINNED DOWN TO ZERO (the late game's last two): saves/field_re/pre_scene_19f.* is made by the recipe lg_ocean_palace_19f (Jackie's ch22 played through the Ocean Palace to the aftermath; ocean-palace-aftermath-chain-vs-oracle and ow-1f5-wave-and-light-vs-oracle pass on it with their pins unchanged). No check reads a private capture any more: tools/private_captures.json is empty, and any new check on a local capture fails here as UNCLASSIFIED. | RE-PINNED 2026-10-25 (CC_Remaster_Project M7): 629 -> 630 checks -- hd-presenter-records-name-the-texels-drawn-in-a-battle reads saves/battle_re/forest_pre_wrapped.lakewram (a recipe's); the files unchanged."
     },
     {
       "name": "bugreport-report-replays-on-both-sides",
@@ -47474,18 +47474,23 @@
         "bugreport: saved 0001 frame 3200 loc 002 mode field category other",
         "bugreport: saved 0002 frame 4059 loc 002 mode field category other (note to add)",
         "bugreport: saved 0001 frame 4500 loc 002 mode field category other",
+        "bugreport: saved 0001 frame 3300 loc 002 mode field category other",
+        "bugreport: saved 0001 frame 3150 loc 002 mode field category other",
+        "bugreport: saved 0002 frame 3400 loc 002 mode field category other",
         "bugreport-check: panel report 0001 frame 3200 note \"the bed's shadow is one pixel off\" category other, screen 512x448 (the window; picture 256 wide at x1), report 0001 frame 3200: wram 131072/131072 identical, picture identical (fnv F5E6300B)",
         "bugreport-check: panel report 0002 frame 4059 note \"\" (note to add) category other, screen 512x448 (the window; picture 256 wide at x1), report 0002 frame 4059: wram 131072/131072 identical, picture identical (fnv 7915CFFC)",
         "bugreport-check: panel report 0001 frame 4500 note \"16:9 at 2x\" category other, screen 796x448 (the window; picture 398 wide at x2), report 0001 frame 4500: wram 131072/131072 identical, picture identical (fnv DC261A2F)",
-        "bugreport-check: console.txt holds the session's start"
+        "bugreport-check: console.txt holds the session's start",
+        "bugreport-check: the touchpad bound to Select, held from 3100, `~` at 3300: reports at 3300",
+        "bugreport-check: the touchpad held from 3100, `~` at 3150 and 3400: reports at 3150, 3400"
       ],
       "pin": [
         "^bugreport: saved",
         "^bugreport-check: "
       ],
       "timeout_s": 600,
-      "note_pass": "the bug reporter's player side: `~` opens the panel over the paused game, a note typed into it is saved with the report, the DualSense's touchpad held a second takes one with no note, the window as drawn is the report's screen.png, the console is kept; every report replays exactly with every mod off -- the second after the panel's pause, the third from a session in 16:9 at 2x internal resolution",
-      "notes": "2026-10-25 (CC_Remaster_Project M6). tools/bugreport.py check-panel: the drive of bugreport-report-replays-on-both-sides under the interactive presentation without a window (CT_BUGKEYS with CT_NOPACE, the dummy video driver, the overlay's ImGui, CT_BUG_CONSOLE): at frame 3200 the events of `~` (SDL_SCANCODE_GRAVE and its typed character), the panel's text box filled by text events and Enter on its third frame (CT_BUGPANEL_TYPE); at frame 4000 the touchpad button's press, held: a report at its 60th frame (4059), note to add. A second session in widescreen 16:9 at 2x internal resolution (CT_SETTINGS) reports at 4500: its screen.png is the 796x448 window, its 256x224 picture the middle of the 398-wide frame. Each report replayed headless in the engine (CT_REPLAY_CHECK), where every mod is off: identical work RAM and picture is the presentation leaving the game alone (the render-independence check of PLAN Phase 8, in miniature). Not graded: the panel's SDL_FlushEvent (defensive: on Windows the character `~` types comes in the key's own batch of events, which the main loop takes). The buttons kept from the game while the key that closed the panel is down are graded by bugreport-live-pad-records-what-the-player-pressed. Needs third_party/imgui. The old code has no reporter (no report line).",
+      "note_pass": "the bug reporter's player side: `~` opens the panel over the paused game, a note typed into it is saved with the report, the DualSense's touchpad held a second takes one with no note, the window as drawn is the report's screen.png, the console is kept; every report replays exactly with every mod off -- the second after the panel's pause, the third from a session in 16:9 at 2x internal resolution; the touchpad bound to a button of the game takes no report, and a hold the panel took starts over",
+      "notes": "2026-10-25 (CC_Remaster_Project M6). tools/bugreport.py check-panel: the drive of bugreport-report-replays-on-both-sides under the interactive presentation without a window (CT_BUGKEYS with CT_NOPACE, the dummy video driver, the overlay's ImGui, CT_BUG_CONSOLE): at frame 3200 the events of `~` (SDL_SCANCODE_GRAVE and its typed character), the panel's text box filled by text events and Enter on its third frame (CT_BUGPANEL_TYPE); at frame 4000 the touchpad button's press, held: a report at its 60th frame (4059), note to add. A second session in widescreen 16:9 at 2x internal resolution (CT_SETTINGS) reports at 4500: its screen.png is the 796x448 window, its 256x224 picture the middle of the 398-wide frame. Each report replayed headless in the engine (CT_REPLAY_CHECK), where every mod is off: identical work RAM and picture is the presentation leaving the game alone (the render-independence check of PLAN Phase 8, in miniature). Not graded: the panel's SDL_FlushEvent (defensive: on Windows the character `~` types comes in the key's own batch of events, which the main loop takes). The buttons kept from the game while the key that closed the panel is down are graded by bugreport-live-pad-records-what-the-player-pressed. Needs third_party/imgui. The old code has no reporter (no report line). 2026-10-25 (CC_Remaster_Project M7, from the owner's ultrareview of cc-remaster since ef05ea9): two more sessions -- the touchpad bound to Select (`[controls] pad_select=touchpad`) takes no report, `~` still does (field.c: the touchpad's report only while fieldPadButtonOf has it free, as `~` fieldKeyPadOf); and the touchpad held over the panel (`~` at 3150) takes none 60 frames after its press: the panel's modal loop takes the touchpad's release and unplug events, so its hold starts over when the panel closes. The console's tee compares dup2's result as POSIX gives it (the new fd; Windows' _dup2 is wrapped to the same contract), so `!= 0` -- every redirect a failure on Linux / macOS -- is caught here too.",
       "mutations": [
         {
           "file": "src/field.c",
@@ -47522,6 +47527,24 @@
           "find": "  int x0 = (g_lastShownW - CAMW) / 2;",
           "replace": "  int x0 = 0; /* MUT */",
           "why": "the 256x224 picture of a widescreen frame is its left edge, not its middle: the 16:9 report's picture is not the replay's"
+        },
+        {
+          "file": "src/field.c",
+          "find": "        if (e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD && !fieldPadButtonOf(SDL_CONTROLLER_BUTTON_TOUCHPAD))",
+          "replace": "        if (e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD) /* MUT */",
+          "why": "the touchpad takes a report though the player bound it to a button of the game"
+        },
+        {
+          "file": "src/field.c",
+          "find": "static void hostModalClosed(void) { g_hostInOptions = 0; CtTouchPadReset(); g_bugTouchDown = 0; }",
+          "replace": "static void hostModalClosed(void) { g_hostInOptions = 0; CtTouchPadReset(); /* MUT */ }",
+          "why": "a modal loop's close (the panel's, the F1 overlay's: hostModalClosed) keeps the touchpad's hold the loop took the release of"
+        },
+        {
+          "file": "src/bugreport_console.c",
+          "find": "    if (g_str[k].orig < 0 || ct_dup2(fds[1], g_str[k].fd) < 0) {",
+          "replace": "    if (g_str[k].orig < 0 || ct_dup2(fds[1], g_str[k].fd) != 0) { /* MUT */",
+          "why": "dup2's new fd read as a failure (POSIX): the console is never kept"
         }
       ]
     },
@@ -47639,7 +47662,8 @@
         "SDL_VIDEODRIVER": "dummy",
         "SDL_AUDIODRIVER": "dummy",
         "CT_NOPACE": "1",
-        "CT_HDCHECK": "1"
+        "CT_HDCHECK": "1",
+        "CT_HD_STATS": "1"
       },
       "inputs": [
         "ct_assets.dat",
@@ -47647,11 +47671,13 @@
       ],
       "expect": [
         "hdcheck: 1000 frames, 0 differ, 0 px",
-        "hdcheck-native: 4000 frames, 0 differ, 0 px"
+        "hdcheck-native: 4000 frames, 0 differ, 0 px",
+        "hd-coverage: field 100.0% of 86055389 px, overworld 100.0% of 20273114 px"
       ],
       "pin": [
         "^hdcheck: \\d+ frames",
-        "^hdcheck-native: \\d+ frames"
+        "^hdcheck-native: \\d+ frames",
+        "^hd-coverage: "
       ],
       "timeout_s": 600,
       "note_pass": "the HD presenter (a mod) draws the field from its HD pictures exactly as the game composes it: with the check's art (every chip its own pixels, each 4x4) every field frame of the attract it draws is the composed frame at 4x (where no layer stands between two pixels) and the native drawer's at 4x, at t = 256 and halfway between two frames: 0 px",
@@ -47674,6 +47700,12 @@
           "find": "        if (spfRow[X] == 2 || !fg) { memcpy(c, spRow + X * 3, 3); sprPal = sppRow[X]; }",
           "replace": "        if (spfRow[X]) { memcpy(c, spRow + X * 3, 3); sprPal = sppRow[X]; } /* MUT */",
           "why": "the sprites are drawn over the map's priority-1 foreground"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "  if (t == 256 && covNow != covFrame) {            // (coverage: each frame once -- the map's pixels are its cells')",
+          "replace": "  if (t == 256) { /* MUT */",
+          "why": "the coverage counts a frame each time it is drawn at t = 256 (CT_HDCHECK draws it again)"
         }
       ]
     },
@@ -47723,6 +47755,528 @@
           "find": "  if (!full && g_pics.gen == C->gen) return 1;",
           "replace": "  if (!full) return 1; /* MUT */",
           "why": "the HD pictures are drawn once a location and never follow the map's animation"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-changes-nothing-of-the-game",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/hd_independence.py",
+        "00_newgame",
+        "13_canyon",
+        "21_inn",
+        "-j",
+        "3",
+        "--hd-dir",
+        "build/_hd_none"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/hd_independence.py",
+        "tools/playthrough.py",
+        "tools/playthrough/route.txt"
+      ],
+      "expect": [
+        "hd-independence: 00_newgame 2602 frames identical (picture, work RAM and battery)",
+        "hd-independence: 13_canyon 2857 frames identical (picture, work RAM and battery)",
+        "hd-independence: 21_inn 2509 frames identical (picture, work RAM and battery)",
+        "hd-independence: 3/3 legs identical, 7968 frames"
+      ],
+      "pin": [
+        "^hd-independence: "
+      ],
+      "timeout_s": 1800,
+      "note_pass": "the render-independence check (the remaster's Gate 2, PLAN Phase 8): three legs of the playthrough route -- power-on through the title, the name and the opening; the canyon's first fight; the inn and its night -- played with every mod off and with the HD presenter drawing every frame give the same engine picture and the same 128 KB of work RAM on every frame",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). tools/hd_independence.py: each leg from its start state as tools/playthrough.py's port side plays it (the first from power-on with the leg's pad as CT_PLAYINPUT, the drive conversion of tools/bugreport/boot_to_bedroom.log), twice -- vanilla and CT_HD_PRESENTER=1 (the automatic pass's art made on the spot: no pack needed) -- each writing CT_FRAMEHASH (per frame, before its input: the fnv of the 256x224 picture the frame before composed and of the 128 KB of work RAM); the two files must be equal line for line. The remaster runs every leg of the route (Gate 2's evidence, its docs/LOG.md). The mutations plant what the check exists to catch: a presenter that writes the game's RAM, and one that changes the engine's own picture. The old code has no CT_FRAMEHASH and no HD presenter (no hd-independence line). 2026-10-25 (CC_Remaster_Project M7, from the milestone's fresh-context review): a third mutation writes the battery (the hash's third column); the art is build/_hd_none (no pack: every source made by the automatic pass), so the run does not depend on a machine's hd folder.",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "replace": "      if (hostHd() && g_bugFrame == 1500) CtWramSys(fieldWram())[0x0300] ^= 0x10; /* MUT */\n      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "why": "the HD presenter writes one byte of the game's work RAM once"
+        },
+        {
+          "file": "src/field.c",
+          "find": "  // the HD presenter: the field from HD art (hdpresent.c), at t or as the frame itself; any other picture from what each",
+          "replace": "  if (hostHd() && t == 256) ((uint8_t*)fb)[(size_t)100 * w * 3 + 300] ^= 0x08; /* MUT */\n  // the HD presenter: the field from HD art (hdpresent.c), at t or as the frame itself; any other picture from what each",
+          "why": "the HD presenter changes one pixel of the engine's own picture as it draws"
+        },
+        {
+          "file": "src/field.c",
+          "find": "      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "replace": "      if (hostHd() && g_bugFrame == 1500) g_sram[0x10] ^= 0x01; /* MUT */\n      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "why": "the HD presenter writes one byte of the battery once"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-in-the-players-presentation",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/hd_independence.py",
+        "session",
+        "--headless",
+        "--backend",
+        "sdl",
+        "--hd-dir",
+        "build/_hd_none"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/hd_independence.py",
+        "tools/bugreport.py",
+        "tools/bugreport/boot_to_bedroom.log"
+      ],
+      "expect": [
+        "hd-session: hd-coverage: field 99.0% of 89390642 px, overworld 100.0% of 136045952 px",
+        "hd-session: srccheck: 496372098 texels recorded and checked, 0 name another index",
+        "hd-session: report 0001 frame 4700: the window 1592x896, drawn by the HD presenter; replayed with every mod off: report 0001 frame 4700: wram 131072/131072 identical, picture identical (fnv 50C57E0E)",
+        "hd-session: PASS -- 1 report(s), the game untouched"
+      ],
+      "pin": [
+        "^hd-session: hd-coverage: ",
+        "^hd-session: srccheck: ",
+        "^hd-session: report ",
+        "^hd-session: (PASS|FAIL)"
+      ],
+      "timeout_s": 900,
+      "note_pass": "the HD presenter as a player turns it on -- `[video] presenter=hd` in the options file, 16:9, the player's window and presentation (the interactive host, a hidden window: the probes' rule) -- on a session driven from power-on by a virtual controller (no keyboard): the HD presenter draws (its coverage line) and the report taken in Crono's room replays exactly with every mod off; report.json says the HD presenter drew the picture",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). tools/hd_independence.py session: Belthasar --boot with CT_BUGPAD (a virtual SDL game controller whose buttons follow tools/bugreport/boot_to_bedroom.log through the default pad bindings -- the DualSense's mapping), CT_NOPACE (the interactive presentation, unpaced), CT_SETTINGS = an options file with presenter=hd, widescreen=16:9, window_scale=4, and CT_BUGREPORT_AT=4700; the report's screen.png is the window as the presenter drew it (1592x896 here; with --fullscreen and a real video driver the desktop's size: the remaster's docs/LOG.md has the 1920x1080 run on OpenGL), and it is replayed headless with every mod off (bugreport.py engine_check: all 128 KB of work RAM and the picture identical). The old code has no HD presenter (no coverage line, no presenter option). 2026-10-25 (CC_Remaster_Project M7, from the owner's ultrareview of cc-remaster since ef05ea9): the report's report.json says the HD presenter drew it (`hd_presenter`); graded. 2026-10-25 (CC_Remaster_Project M7, from the milestone's fresh-context review): CT_SRCCHECK on in the session: every recorded texel, the menus' chrome and the sequences' PPU model's tiles and sprites among them, names the index its drawer drew (`srccheck:`).",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "replace": "      if (CtSettingsGet()->presenter == CT_PRESENTER_HD && g_bugFrame == 2000) CtWramSys(fieldWram())[0x0300] ^= 0x10; /* MUT */\n      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "why": "the presenter option, chosen in the options file, writes one byte of the game's work RAM"
+        },
+        {
+          "file": "src/field.c",
+          "find": "           (g_hostInteractive && CtSettingsGet()->presenter == CT_PRESENTER_HD);",
+          "replace": "           0; /* MUT */",
+          "why": "the options file's presenter=hd is not applied: the session draws the vanilla picture"
+        },
+        {
+          "file": "src/field.c",
+          "find": "           g_ctSrcOn);                                 // (the HD presenter drew this frame: its records are on, hdsrc.h)",
+          "replace": "           0); /* MUT */",
+          "why": "report.json says the vanilla presenter drew a picture the HD presenter drew"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-in-16-9-through-a-fight",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/hd_independence.py",
+        "session",
+        "--headless",
+        "--backend",
+        "sdl",
+        "--legs",
+        "13",
+        "--hd-dir",
+        "build/_hd_none"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/hd_independence.py",
+        "tools/bugreport.py",
+        "tools/playthrough.py",
+        "tools/playthrough/route.txt"
+      ],
+      "expect": [
+        "hd-session: hd-coverage: field 98.7% of 1727604249 px, battle 64.3% of 143388935 px, menu 100.0% of 3329580 px, overworld 100.0% of 171974208 px",
+        "hd-session: srccheck: 3589605974 texels recorded and checked, 0 name another index",
+        "hd-session: report 0001 frame 28701: the window 1592x896, drawn by the HD presenter; replayed with every mod off: report 0001 frame 28701: wram 131072/131072 identical, picture differs (fnv 209D7A51, report 4ECE6229)",
+        "hd-session: PASS -- 1 report(s), the game untouched"
+      ],
+      "pin": [
+        "^hd-session: hd-coverage: ",
+        "^hd-session: srccheck: ",
+        "^hd-session: report ",
+        "^hd-session: (PASS|FAIL)"
+      ],
+      "timeout_s": 4000,
+      "note_pass": "the HD presenter in the player's presentation at 16:9 from power-on through the canyon's first fight and out of it (route legs 00-13 on a virtual controller): the session runs to the report -- the widescreen field's assembly after a fight's -- and the work RAM replays exactly with every mod off; report.json says the HD presenter drew the picture",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the milestone review). A picture that shows another one's records (hdsrc.h CtSrcShows: the 16:9 battle's and sequence's assembly) left an alias slot with no records of its own, and the field's 16:9 assembly then wrote through it (CtSrcCopyRow / CtSrcNone): the game crashed on the first field frame after a fight with the HD presenter on in 16:9. hd_independence.py session --legs 13 drives legs 00-13 (playthrough.py's route as the engine's input, the boot drive's conversion) with presenter=hd and widescreen=16:9, reports 30 frames before the end, and grades the work RAM (the 16:9 report's 256x224 picture is the wide picture's middle, which differs from the engine's view where the camera stops at the canyon's edge -- the bug reporter's, with the vanilla presenter too). The alias's writes are guarded (hdsrc.c) and graded directly by hd-presenter-records-hold-on-a-picture-that-shows-another; the route never reaches them (the field's wide picture always has records of its own). The old code has no HD presenter. 2026-10-25 (CC_Remaster_Project M7, from the owner's ultrareview of cc-remaster since ef05ea9): the report's report.json says the HD presenter drew it (`hd_presenter`); graded. 2026-10-25 (CC_Remaster_Project M7, from the milestone's fresh-context review): CT_SRCCHECK on in the session: every recorded texel, the menus' chrome among them, names the index its drawer drew (`srccheck:`).",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "replace": "      if (CtSettingsGet()->presenter == CT_PRESENTER_HD && g_bugFrame == 26000) CtWramSys(fieldWram())[0x0300] ^= 0x10; /* MUT */\n      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {",
+          "why": "the presenter, in 16:9 after the fight, writes one byte of the game's work RAM"
+        },
+        {
+          "file": "src/menu.c",
+          "find": "            if (g_ctSrcOn) { const uint32_t tg = sInst ? CtSrcTag(sInst, xx, yy) : 0;",
+          "replace": "            if (g_ctSrcOn) { const uint32_t tg = sInst ? CtSrcTag(sInst, yy, xx) : 0; /* MUT */",
+          "why": "the menus' chrome recorded transposed"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-records-name-the-texels-drawn",
+      "tier": "full",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "433",
+        "--frames",
+        "11000",
+        "--selftest"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOPACE": "1",
+        "CT_HD_PRESENTER": "1",
+        "CT_SRCCHECK": "1",
+        "CT_HD_STATS": "1",
+        "CT_HD_DIR": "build/_hd_none"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "srccheck: 419844599 texels recorded and checked, 0 name another index",
+        "hd-stats: 11091 frames recorded, 10359 sources (10359 made on the spot), 416857680 pixels with a source, 21487437 without, 24 map pictures built, 143606 cells drawn, 2221 pictures redrawn from their records",
+        "hd-pictures: 6717 pictures drawn, fnv ED2B029076DD50D5"
+      ],
+      "pin": [
+        "^srccheck: ",
+        "^hd-stats: ",
+        "^hd-pictures: "
+      ],
+      "timeout_s": 900,
+      "note_pass": "the HD presenter's records (src/hdsrc.c: what each pixel was drawn from) over the attract's first 11000 frames -- the field's sprites cell by cell, the text box's window chips and glyphs, the map under a battle, the battle's combatants, effects, popups and HUD, the world map's tiles, the menus' chrome and font: every texel a drawer records names the index it drew there (its source, flips and place right)",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). With the HD presenter on (CT_HD_PRESENTER=1; no pack: CT_HD_DIR names none, the automatic pass draws everything) every drawer that knows which tile, sprite cell or glyph a pixel comes from records it as it writes the pixel (hdsrc.h CtSrcPut: the source's content, one draw of it with its flips, the texel), and CT_SRCCHECK has each of them say the index it drew: the record's texel must hold that index in the source (CtSrcExpect). `hd-stats:` pins how much of the picture was drawn from records (pixels with a source / without) and the pictures redrawn from them. The counts move with an intentional change to what is recorded (a new drawer, the attract's frames); `name another index` must stay 0. The old code has no records (no srccheck line). The battle's drawers are graded by hd-presenter-records-name-the-texels-drawn-in-a-battle (the attract's 11000 frames hold no fight); the map's records by their own test: the recorded chip in its colours is the layer picture's pixel. 2026-10-25 (CC_Remaster_Project M7, from the milestone's fresh-context review): `hd-pictures:` pins the hash of every HD picture drawn (CtHdHashPicture; the pack none: the automatic pass, deterministic) -- the colour each HD index takes, the art rounding into a draw's transparent texels and the growth over a later draw's -- so the real-art paths are graded, not only how much of the picture they cover. The sequences' PPU model (seq_pic.c, the attract's) checks its records too (a transposed BG tile is caught).",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "          g_srcTag = CtSrcTag(srcInst[u], (srcFl[u] & 1) ? 7 - bx : bx, (srcFl[u] & 2) ? 7 - by : by);",
+          "replace": "          g_srcTag = CtSrcTag(srcInst[u], bx, (srcFl[u] & 2) ? 7 - by : by); /* MUT */",
+          "why": "a field sprite's x-flipped cell is recorded unflipped"
+        },
+        {
+          "file": "src/field.c",
+          "find": "    int tx = (ce->flags & 1) ? 7 - (px & 7) : (px & 7), ty = (ce->flags & 2) ? 7 - (py & 7) : (py & 7);",
+          "replace": "    int tx = px & 7, ty = (ce->flags & 2) ? 7 - (py & 7) : (py & 7); /* MUT */",
+          "why": "the map's x-flipped chips recorded unflipped (a battle's arena)"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "            memcpy(sp + q * 3, (hv == v || hv >= 16 || !(e->has >> hv & 1)) ? rgb : e->col[hv], 3);",
+          "replace": "            memcpy(sp + q * 3, rgb, 3); /* MUT */",
+          "why": "a sprite's HD index of another colour takes the pixel's own colour"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "          if ((unsigned)qx >= (unsigned)w || (unsigned)qy >= 224u || grp[qy * w + qx] == e->group) continue;",
+          "replace": "          if ((unsigned)qx >= (unsigned)w || (unsigned)qy >= 224u) continue; /* MUT */",
+          "why": "a sprite cell's art rounds into its own sprite's other cells"
+        },
+        {
+          "file": "src/seq_pic.c",
+          "find": "                          base, depth, ((tile & 0x4000) ? 1 : 0) | ((tile & 0x8000) ? 2 : 0), 7 - col, row);",
+          "replace": "                          base, depth, ((tile & 0x4000) ? 1 : 0) | ((tile & 0x8000) ? 2 : 0), row, 7 - col); /* MUT */",
+          "why": "the sequences' BG tiles recorded transposed"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-records-name-the-texels-drawn-in-a-battle",
+      "tier": "full",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "19",
+        "--loadwram",
+        "saves/battle_re/forest_pre_wrapped.lakewram"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOPACE": "1",
+        "CT_BATTLE_MASHA": "1",
+        "CT_SHOTS": "build/_bsrc",
+        "CT_SHOTS_AT": "1500",
+        "CT_SHOTS_EXIT": "1",
+        "CT_HD_PRESENTER": "1",
+        "CT_SRCCHECK": "1",
+        "CT_HD_STATS": "1",
+        "CT_HD_DIR": "build/_hd_none"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "saves/battle_re/forest_pre_wrapped.lakewram"
+      ],
+      "expect": [
+        "srccheck: 183085748 texels recorded and checked, 0 name another index",
+        "hd-coverage: field 100.0% of 22038528 px, battle 99.7% of 58660854 px",
+        "hd-stats: 1501 frames recorded, 898 sources (898 made on the spot), 183085748 pixels with a source, 54333 without, 1 map pictures built, 18432 cells drawn, 1091 pictures redrawn from their records",
+        "hd-pictures: 1500 pictures drawn, fnv 253DA5F89431CD2D"
+      ],
+      "pin": [
+        "^srccheck: ",
+        "^hd-coverage: ",
+        "^hd-stats: ",
+        "^hd-pictures: "
+      ],
+      "timeout_s": 600,
+      "note_pass": "the HD presenter's records over a Guardia Forest fight (battle-motion-owners-explain-the-fight's): the arena's map chips, the combatants' cells, the effects, the damage numbers, the HUD's window and text -- every recorded texel names the index its drawer drew, and the map's chip in its colours is the layer picture's pixel; how much of the battle's picture is drawn from HD art is pinned",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). hd-presenter-records-name-the-texels-drawn's twin over a fight: --scene 19 from forest_pre_wrapped.lakewram with CT_BATTLE_MASHA (A on every command), 1500 frames, the HD presenter on with no pack (the automatic pass on the spot), CT_SRCCHECK and CT_HD_STATS. The counts move with an intentional change to the drawers; `name another index` must stay 0. The old code has no records (no srccheck line). 2026-10-25 (CC_Remaster_Project M7, from the milestone's fresh-context review): `hd-pictures:` pins the hash of every HD picture drawn (CtHdHashPicture; the pack none: the automatic pass, deterministic) -- the colour each HD index takes, the art rounding into a draw's transparent texels and the growth over a later draw's -- so the real-art paths are graded, not only how much of the picture they cover.",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "          g_srcTag = sInst ? CtSrcTag(sInst, xx, yy) : 0;\n          if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);\n          plot(fb, bx + sx, by + sy,",
+          "replace": "          g_srcTag = sInst ? CtSrcTag(sInst, yy, xx) : 0; /* MUT */\n          if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);\n          plot(fb, bx + sx, by + sy,",
+          "why": "a battle cell's texel recorded transposed"
+        },
+        {
+          "file": "src/field.c",
+          "find": "        g_srcTag = CtSrcTag(inst, 7 - bit, fy);",
+          "replace": "        g_srcTag = CtSrcTag(inst, bit, fy); /* MUT */",
+          "why": "the HUD's glyphs recorded mirrored"
+        },
+        {
+          "file": "src/field.c",
+          "find": "    int tx = (ce->flags & 1) ? 7 - (px & 7) : (px & 7), ty = (ce->flags & 2) ? 7 - (py & 7) : (py & 7);",
+          "replace": "    int tx = px & 7, ty = (ce->flags & 2) ? 7 - (py & 7) : (py & 7); /* MUT */",
+          "why": "the arena's x-flipped map chips recorded unflipped"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "        } else if (hv < 16 && (r.e->has >> hv & 1)) scaled(r.e->col[hv], &r.tr, o);",
+          "replace": "        } else if (0) scaled(r.e->col[hv], &r.tr, o); /* MUT */",
+          "why": "a recorded pixel's HD index of another colour is drawn in the pixel's own colour"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "  if (best)\n    for (int j = 0; j < HDK; j++)",
+          "replace": "  if (0 && best) /* MUT */\n    for (int j = 0; j < HDK; j++)",
+          "why": "a later draw's art never grows over its transparent texels' neighbours"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-turns-off-and-on",
+      "tier": "full",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "433",
+        "--frames",
+        "5000",
+        "--selftest"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOPACE": "1",
+        "CT_HD_PRESENTER": "2500-4000",
+        "CT_HD_STATS": "1",
+        "CT_HD_DIR": "build/_hd_none"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "hd-stats: 1501 frames recorded, 2451 sources (2451 made on the spot), 97233594 pixels with a source, 0 without, 4 map pictures built, 27809 cells drawn, 17 pictures redrawn from their records"
+      ],
+      "pin": [
+        "^hd-stats: "
+      ],
+      "timeout_s": 600,
+      "note_pass": "the HD presenter on over frames 2500-4000 of the attract only (CT_HD_PRESENTER=<from>-<to>, as a player turning it on and then off in the options): its records are kept on exactly those frames and none after it is turned off",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the milestone review). hostHd() turns the records (hdsrc.h g_ctSrcOn) on and off with the option -- dropping the old ones when it comes back -- where they used to stay on for the rest of the session once the presenter had been tried. `hd-stats:` pins the frames recorded (the window's) and what was recorded in them. The old code has no frame window (the presenter stays on: every frame recorded).",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "  if (on != g_ctSrcOn && opened) {                 // (the records follow the option: none while it is off, a clean",
+          "replace": "  if (on && !g_ctSrcOn && opened) { /* MUT */",
+          "why": "the records stay on after the presenter is turned off"
+        }
+      ]
+    },
+    {
+      "name": "hd-automatic-pass-writes-the-same-pack",
+      "tier": "quick",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--hdautopass",
+        "build"
+      ],
+      "inputs": [
+        "ct_assets.dat"
+      ],
+      "expect": [
+        "hdautopass: 512 locations, 436 sprites, 46544 sources (19892 drawn by the maps, 834 more in their animation sets, 25818 more in the sprites) -> build/chips4x.pack, fnv EC167B8D5BFEDDE8"
+      ],
+      "pin": [
+        "^hdautopass: "
+      ],
+      "timeout_s": 120,
+      "note_pass": "the automatic pass (Scale2x twice on the palette indices) over every location's chips, their animation sets and every sprite's tiles writes the same pack, entry for entry: its hash",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the milestone review: the pass must be byte-identical when re-run). Belthasar --hdautopass writes build/chips4x.pack and prints the count of sources and the fnv of every entry (its indices and its HD art). The remaster's tools/cthd.py makes the same bytes (its upscale-check). Re-pin only after an intentional change to the pass or to the sources it walks.",
+      "mutations": [
+        {
+          "file": "src/hdpresent.c",
+          "find": "      o[1] = (A == B && A != C && B != D) ? B : P;",
+          "replace": "      o[1] = (A == B && A != C) ? B : P; /* MUT */",
+          "why": "Scale2x's top-right rule loses a condition: the art changes"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-records-hold-on-a-picture-that-shows-another",
+      "tier": "quick",
+      "argv": [
+        "build/Belthasar.exe",
+        "--hdsrctest"
+      ],
+      "inputs": [],
+      "expect": [
+        "hdsrctest: PASS -- writes to a picture that shows another: none taken; the other's record read through it: at its column"
+      ],
+      "pin": [
+        "^hdsrctest: "
+      ],
+      "timeout_s": 30,
+      "note_pass": "the HD presenter's records' contract (hdsrc.h): a picture that shows another (the 16:9 battle's and sequence's assembly, CtSrcShows) takes no write of its own -- CtSrcNone, CtSrcNoneRect, CtSrcBlend, a copy with nothing to copy -- and reads the other's record through it at its column",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the milestone review). An alias slot has no records of its own; the writes that found it by its picture wrote through its missing arrays (a crash). Belthasar --hdsrctest drives the contract directly: the alias, the four writes, a record put in the view and read through the alias. The old code has no --hdsrctest (and crashes on the writes).",
+      "mutations": [
+        {
+          "file": "src/hdsrc.c",
+          "find": "  if (!d || d->w != dw || !d->tag) return;         // (no records to copy into one that has none: nothing to do)",
+          "replace": "  if (!d || d->w != dw) return; /* MUT */",
+          "why": "CtSrcCopyRow writes into an alias slot (no records): the crash after a fight in 16:9"
+        },
+        {
+          "file": "src/hdsrc.c",
+          "find": "  if (!p || p->w != w || !p->tag) return;          // (nothing recorded there yet -- or an alias: nothing to drop)",
+          "replace": "  if (!p || p->w != w) return; /* MUT */",
+          "why": "CtSrcNone writes into an alias slot"
+        },
+        {
+          "file": "src/hdsrc.c",
+          "find": "  if (!p || p->w != w || !p->tag) return;\n  for (int yy = y < 0 ? 0 : y; yy < y + rh && yy < PH; yy++)",
+          "replace": "  if (!p || p->w != w) return; /* MUT */\n  for (int yy = y < 0 ? 0 : y; yy < y + rh && yy < PH; yy++)",
+          "why": "CtSrcNoneRect writes into an alias slot"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/hd_independence.py",
+        "22_cathedral",
+        "--coverage",
+        "--hd-dir",
+        "build/_hd_none"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/hd_independence.py",
+        "tools/playthrough.py",
+        "tools/playthrough/route.txt"
+      ],
+      "expect": [
+        "hd-independence: 22_cathedral 13719 frames identical (picture, work RAM and battery)",
+        "hd-independence: 22_cathedral coverage: field 99.6% of 235140184 px, battle 99.9% of 491357124 px, menu 25.5% of 4524040 px; 1214470623 pixels with a source, 224991 without",
+        "hd-independence: 1/1 legs identical, 13719 frames"
+      ],
+      "pin": [
+        "^hd-independence: "
+      ],
+      "timeout_s": 2400,
+      "note_pass": "route leg 22 (Manoria Cathedral: the nave, the Naga-ettes' fight, Frog) with and without the HD presenter: identical frame for frame, and the fight's picture drawn from HD art -- the cathedral's map is on the sub screen under BG3's light, and the arena's records take the sub screen's layer where the main screen shows only its backdrop",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). The route's battles in Manoria's cathedral and sanctum (loc 081 / 082: TM BG3, TS BG1 BG2, the colour math showing the sub screen) drew 30-36% of their picture from HD art: the arena's records (field.c fieldMapRecord) looked at the main screen's layers alone, so only the light had records. They now fall back to the sub screen's top layer there, a blend over its record (hdsrc.h CtSrcBlend). 99.9% since. `coverage:` pins the share per mode and the exact count of pixels with a source and without (hd-stats'; the pack none: every source made on the spot, the counts do not depend on it). (The battle's effect layer -- BG3 and colour math over the arena, battle.c btFxCompose -- records nothing: in no route fight does it change a record, so it is left to the frame's own colours, CtHdSrcBlock.)",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "  for (int k = 0; k < 12; k++) {\n    const int i = 5 - k % 6, sub = k >= 6;",
+          "replace": "  for (int k = 0; k < 6; k++) { /* MUT */\n    const int i = 5 - k % 6, sub = k >= 6;",
+          "why": "the arena's records look at the main screen alone: the cathedral's map has none"
+        }
+      ]
+    },
+    {
+      "name": "regress-refresh-keeps-inputs-this-machine-lacks",
+      "tier": "quick",
+      "argv": [
+        "python",
+        "tools/regress_selftest.py"
+      ],
+      "inputs": [],
+      "expect": [
+        "regress-selftest: PASS -- a catalogued input a check names in its argv, absent here: kept; an uncatalogued one: not added"
+      ],
+      "pin": [
+        "^regress-selftest: "
+      ],
+      "timeout_s": 60,
+      "note_pass": "regress.py --refresh-input-hashes keeps a catalogued input that a check names only in its argv or env when this machine lacks the file (a state another machine makes), and adds no uncatalogued one",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the owner's ultrareview of cc-remaster since ef05ea9). tools/regress.py _input_users: a file a check named only in its argv or env counted as read only if it existed locally, so a refresh on a machine without it deleted its catalogue entry (provenance, hashes). It now counts when the catalogue already holds it too. The old code has no _input_users.",
+      "mutations": [
+        {
+          "file": "tools/regress.py",
+          "find": "                if p in by_path or os.path.isfile(os.path.join(ROOT, p)):",
+          "replace": "                if os.path.isfile(os.path.join(ROOT, p)):  # MUT",
+          "why": "a catalogued input this machine lacks is dropped on a refresh"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-refuses-art-past-its-palette",
+      "tier": "quick",
+      "argv": [
+        "python",
+        "tools/hd_pack_check.py"
+      ],
+      "inputs": [
+        "ct_assets.dat",
+        "tools/hd_pack_check.py"
+      ],
+      "expect": [
+        "hd-pack: PASS -- art naming an index its palette has: 1 sources; art naming index 200 of a 16-colour source: refused"
+      ],
+      "pin": [
+        "^hd-pack: "
+      ],
+      "timeout_s": 300,
+      "note_pass": "the HD presenter's pack reader takes an entry whose art names an index its source's palette has, and refuses a pack whose art names one past it (a map chip's index is colour base + v of the 128)",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, from the owner's ultrareview of cc-remaster since ef05ea9). readPack (src/hdpresent.c) took any byte as an HD index; a map chip's is drawn as colour base + v of the 128-colour palette (drawCell), so a corrupt pack read past it. An entry's art may now name only indices below 16 unless its source uses more; otherwise the pack is refused (the automatic pass draws every source). The old code loads the corrupt pack (`1 sources`).",
+      "mutations": [
+        {
+          "file": "src/hdpresent.c",
+          "find": "    for (size_t k = 0; k < na && ok; k++) if (g_art[id][k] >= lim) ok = 0;",
+          "replace": "    (void)lim; /* MUT */",
+          "why": "the reader takes art naming an index past its source's palette"
         }
       ]
     }

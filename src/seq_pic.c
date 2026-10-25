@@ -1,5 +1,6 @@
 // seq_pic.c -- see seq_pic.h.
 #include "seq_pic.h"
+#include "hdsrc.h"   // the HD presenter's records of what each pixel was drawn from (recorded only while it is on)
 #include <string.h>
 #include <stdio.h>
 
@@ -97,7 +98,29 @@ typedef struct {
   int clip, prevent, addSub, direct, subtract, half, math[6];
   int m7sx, m7sy;
   uint8_t objPix[256], objPri[256];
+  uint32_t objTag[256];                     // (the HD presenter's record of each OBJ pixel: hdsrc.h; 0 none)
 } Line;
+// THE HD PRESENTER'S RECORDS (hdsrc.h): the picture being drawn, and the record of the main screen's pixel pixel() just
+// chose (0 = none: the backdrop, a mode-7 or direct-colour pixel).
+static uint8_t* g_seqRecPic; static uint32_t g_seqTag;
+// A tile's 8x8 source from the VRAM words at `base` (depth 2, 4 or 8 bits, the SNES's planar layout), one draw a cell.
+static uint32_t seqTileTag(const CtSeqPic* p, uint32_t key, unsigned base, int depth, int flags, int tx, int ty) {
+  int inst = CtSrcCellFind(key);
+  if (!inst) {
+    uint8_t idx[64];
+    for (int r = 0; r < 8; r++) {
+      uint16_t a = p->vram[(base + r) & 0x7FFF], b = depth > 2 ? p->vram[(base + 8 + r) & 0x7FFF] : 0;
+      uint16_t c = depth > 4 ? p->vram[(base + 16 + r) & 0x7FFF] : 0, d = depth > 4 ? p->vram[(base + 24 + r) & 0x7FFF] : 0;
+      for (int x = 0; x < 8; x++) {
+        int s = 7 - x;
+        idx[r * 8 + x] = (uint8_t)(((a >> s) & 1) | (((a >> (8 + s)) & 1) << 1) | (((b >> s) & 1) << 2) | (((b >> (8 + s)) & 1) << 3) |
+                                   (((c >> s) & 1) << 4) | (((c >> (8 + s)) & 1) << 5) | (((d >> s) & 1) << 6) | (((d >> (8 + s)) & 1) << 7));
+      }
+    }
+    inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf(idx, 8, 8), flags, 0, 0, 0));
+  }
+  return inst > 0 ? CtSrcTag(inst, tx, ty) : 0;
+}
 
 static void decode(const CtSeqPic* p, Line* L) {
   const uint8_t* r = p->r;
@@ -159,6 +182,7 @@ static int winState(const CtSeqPic* p, const Line* L, int layer, int x) {
 
 static void sprites(CtSeqPic* p, Line* L, int line) {
   memset(L->objPix, 0, sizeof L->objPix);
+  if (g_seqRecPic) memset(L->objTag, 0, sizeof L->objTag);
   if (L->blank) return;
   int idx = L->oamIndex, found = 0, tiles = 0;
   uint8_t list[32];
@@ -196,7 +220,10 @@ static void sprites(CtSeqPic* p, Line* L, int line) {
         int sh = hf ? px : 7 - px;
         int v = ((p1 >> sh) & 1) | (((p1 >> (8 + sh)) & 1) << 1) | (((p2 >> sh) & 1) << 2) | (((p2 >> (8 + sh)) & 1) << 3);
         int sc = col + x + px;
-        if (v && sc >= 0 && sc < 256) { L->objPix[sc] = (uint8_t)(0x80 + 16 * pal + v); L->objPri[sc] = (uint8_t)((at & 0x3000) >> 12); }
+        if (v && sc >= 0 && sc < 256) { L->objPix[sc] = (uint8_t)(0x80 + 16 * pal + v); L->objPri[sc] = (uint8_t)((at & 0x3000) >> 12);
+          if (g_seqRecPic) { L->objTag[sc] = seqTileTag(p, CT_SRC_KEY(30, (unsigned)idx << 8 | (unsigned)(row / 8) << 4 | (unsigned)(uc / 8)),
+                                                        (unsigned)((base + t * 16) & 0x7FFF), 4, (hf ? 1 : 0) | ((at & 0x8000) ? 2 : 0), hf ? 7 - px : px, row & 7);
+                             if (g_ctSrcCheck) CtSrcExpect(L->objTag[sc], v); } }
       }
     }
     if (tiles > 34) break;
@@ -219,6 +246,9 @@ static int bgPixel(const CtSeqPic* p, const Line* L, int x, int y, int layer, in
   int depth = kDepth[L->mode][layer];
   if (L->mode == 0) pal += 8 * layer;
   unsigned base = (unsigned)L->chr[layer] + (unsigned)((tn & 0x3FF) * 4 * depth);
+  if (g_seqRecPic)                                                     // (the HD presenter's record of the cell, if it wins)
+    g_seqTag = seqTileTag(p, CT_SRC_KEY(26 + layer, (ta & 0x7FFF) << 2 | (wideT && (x & 8) ? 1 : 0) | (L->big[layer] && (y & 8) ? 2 : 0)),
+                          base, depth, ((tile & 0x4000) ? 1 : 0) | ((tile & 0x8000) ? 2 : 0), 7 - col, row);
   uint16_t a = p->vram[(base + row) & 0x7FFF];
   int v = ((a >> col) & 1) | (((a >> (8 + col)) & 1) << 1), size = 4;
   if (depth > 2) {
@@ -229,6 +259,7 @@ static int bgPixel(const CtSeqPic* p, const Line* L, int x, int y, int layer, in
     size = 256; uint16_t c = p->vram[(base + 16 + row) & 0x7FFF], d = p->vram[(base + 24 + row) & 0x7FFF];
     v |= (((c >> col) & 1) << 4) | (((c >> (8 + col)) & 1) << 5) | (((d >> col) & 1) << 6) | (((d >> (8 + col)) & 1) << 7);
   }
+  if (g_seqRecPic && g_ctSrcCheck && v) CtSrcExpect(g_seqTag, v);   // (the record names the index drawn: CT_SRCCHECK)
   return v ? size * pal + v : 0;
 }
 
@@ -286,6 +317,7 @@ static int pixel(const CtSeqPic* p, const Line* L, int x, int y, int sub, int* r
     int on = sub ? L->sub[cl] && (!L->subWin[cl] || !winState(p, L, cl, x))
                  : L->main[cl] && (!L->mainWin[cl] || !winState(p, L, cl, x));
     if (!on) continue;
+    if (!sub) g_seqTag = 0;
     if (cl < 4) {
       int lx = x, ly = y;
       if (L->mosaicOn[cl] && L->mosaic > 1) { lx -= lx % L->mosaic; ly -= (ly - p->mosaicStart) % L->mosaic; }
@@ -301,9 +333,11 @@ static int pixel(const CtSeqPic* p, const Line* L, int x, int y, int sub, int* r
       int ox = x;                                                      //  the sub screen's texture repeated 256 along)
       if ((x < 0 || x > 255) && sub && !L->main[4]) ox = x & 255;
       px = (ox >= 0 && ox < 256 && L->objPri[ox] == cp) ? L->objPix[ox] : 0;
+      if (px && !sub && g_seqRecPic) g_seqTag = L->objTag[ox];
     }
     if (px > 0) { layer = cl; break; }
   }
+  if (!sub && (layer == 5 || L->mode == 7 || (L->direct && layer < 4 && kDepth[L->actMode][layer] == 8))) g_seqTag = 0;
   if (L->direct && layer < 4 && kDepth[L->actMode][layer] == 8) {
     *rr = ((px & 7) << 2) | ((px & 0x100) >> 7); *gg = ((px & 0x38) >> 1) | ((px & 0x200) >> 8); *bb = ((px & 0xC0) >> 3) | ((px & 0x400) >> 8);
   } else {
@@ -334,10 +368,12 @@ static void drawLine(CtSeqPic* p, Line* L, int line, uint8_t* out) {
 }
 // One column of the line: the main screen, the colour window's clip, the colour math, the brightness.
 static void shade(CtSeqPic* p, Line* L, int x, int line, uint8_t* o) {
+  uint32_t tag = 0;
   {
     int r = 0, g = 0, b = 0;
     if (!L->blank) {
       int ml = pixel(p, L, x, line, 0, &r, &g, &b);
+      tag = g_seqTag;
       int cw = winState(p, L, 5, x);
       if (L->clip == 3 || (L->clip == 2 && cw) || (L->clip == 1 && !cw)) r = g = b = 0;
       int sl = 5, r2 = 0, g2 = 0, b2 = 0;
@@ -355,6 +391,7 @@ static void shade(CtSeqPic* p, Line* L, int x, int line, uint8_t* o) {
     o[1] = (uint8_t)(((g << 3) | (g >> 2)) * L->bright / 15);
     o[2] = (uint8_t)(((b << 3) | (b >> 2)) * L->bright / 15);
   }
+  if (g_seqRecPic && x >= 0 && x < 256) CtSrcPutTag(g_seqRecPic, 256, x, line - 1, tag, o[0], o[1], o[2]);
 }
 
 // ---- HDMA: the hardware's walk over the stage's tables (the init at the frame's start, a transfer at each line's end) ----
@@ -416,6 +453,7 @@ void CtSeqPicFrame(CtSeqPic* p, const CtSeqPicHdma ch[8], uint8_t en, CtSeqPicRe
   p->mosaicStart = 1;                                                  // (the frame's start: a vblank write counts from line 1)
   p->rangeOver = p->timeOver = 0;                                      // (and the sprite flags cleared: ppu.c handleFrameStart)
   if (rd) { hdmaInit(ch, en, w, rd, ctx); hdmaRun(p, ch, en, w, rd, ctx, 0); }
+  g_seqRecPic = g_ctSrcOn && rgb ? rgb : NULL;                         // (the HD presenter's records: hdsrc.h)
   for (int line = 1; line <= 224; line++) {
     drawLine(p, &L, line, rgb ? rgb + (size_t)(line - 1) * 256 * 3 : scratch);
     if (rd) hdmaRun(p, ch, en, w, rd, ctx, line);
