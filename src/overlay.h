@@ -31,6 +31,14 @@ void CtOverlaySelectTab(int tab);                         // (CT_OVERLAY_SHOT) o
 // The virtual gamepad (touchpad.h) over the picture the host just drew, outside the modal overlay: a frame of its own.
 struct CtTouchDraw;
 void CtOverlayTouchDraw(const struct CtTouchDraw* d);
+// THE BUG REPORTER'S PANEL (bugreport.h), run modal by the host like the options: what went wrong and a category, over
+// the paused picture. One frame of it; 1 = save (Enter or the button: `note` and `*category` hold the answer), -1 =
+// cancel (Esc), 0 = still open. CtOverlayBugPanelOpen before its first frame (it puts the cursor in the text box).
+void CtOverlayBugPanelOpen(void);
+int  CtOverlayBugPanel(char* note, int noteN, int* category);
+// A line of text at the top of the picture the host just drew (the reporter's "Bug report 0007 saved"): a frame of its
+// own, like the virtual gamepad's.
+void CtOverlayToast(const char* text);
 #ifdef __cplusplus
 }
 #endif

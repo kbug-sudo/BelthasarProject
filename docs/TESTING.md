@@ -2514,6 +2514,28 @@ depend on a player's saved options -- and `CT_OVERLAY_SHOT` draws the F1 overlay
 Controls tab at f40 under the dummy video driver and saves the window. Graded: the window is 896x672, the picture fills
 its width on the middle line, the overlay's tabs are drawn. Needs `third_party/imgui` (`tools/get_imgui.ps1`).
 
+### bugreport-report-replays-on-both-sides (`python tools/bugreport.py check`)
+
+The bug reporter (src/bugreport.c; the remaster's in-game `~`, its docs/BUG_REPORTER.md). A session from power-on on an
+erased cartridge, driven by tools/bugreport/boot_to_bedroom.log (tools/playthrough.py's legs 00-02 as the engine's input:
+one frame later, each press's edge on the frame its bit rises), is reported at frame 4700 in Crono's room
+(`CT_BUGREPORT_AT`, no panel). Graded: the report's nine files, its two PNGs decoded against its hash, wram.bin's hash,
+its inputs.log equal to the drive's first 4700 frames; the replay in the engine from power-on with the report's log and
+battery (`CT_PLAYINPUT`, `CT_REPLAY_CHECK`: all 128 KB of work RAM and the picture identical); the replay on the cartridge
+(ct.exe from power-on under the rule with `CT_ORACLE_SRAM`, the log's levels one frame earlier) graded as playthrough.py
+grades its legs -- the chains of location, storyline, party, gold, HP and control from each side's first lit frame, and
+the end picture; and the same log without its edges graded DIFFERENT (the grade can fail). The hashes are the engine's
+state at frame 4700 from power-on: re-pin only after an intentional engine change in the opening, with the replay line
+still identical and the cartridge line SAME.
+
+### bugreport-panel-takes-a-report (`python tools/bugreport.py check-panel`)
+
+The reporter's player side, under the interactive presentation without a window (`CT_BUGKEYS` with `CT_NOPACE`, the
+dummy video driver): at frame 3200 the events of `~`, the panel (Dear ImGui, src/overlay.cpp) filled by text events and
+Enter (`CT_BUGPANEL_TYPE`); at frame 4000 the DualSense's touchpad button pressed and held -- a report at its 60th frame,
+"note to add". Graded: each report's note and category, its screen.png the window as drawn (512x448), and each replayed
+exactly in the engine, the second after the panel's pause. Needs `third_party/imgui`.
+
 ### battle-enemy-census-defeat-exit-tail-hdma-vs-oracle (`python tools/battle_ab.py enemies 6E,E3,F4 -j3`)
 
 Three enemies of the census in GATO's arena whose fights end in the party's defeat: every monitored change, `$AE93` (the

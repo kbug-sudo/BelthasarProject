@@ -10,3 +10,6 @@ void CtOverlayRender(void) {}
 void CtOverlaySetPadName(const char* name) { (void)name; }
 void CtOverlaySelectTab(int tab) { (void)tab; }
 void CtOverlayTouchDraw(const struct CtTouchDraw* d) { (void)d; }
+void CtOverlayBugPanelOpen(void) {}
+int  CtOverlayBugPanel(char* note, int noteN, int* category) { (void)note; (void)noteN; (void)category; return -1; }
+void CtOverlayToast(const char* text) { (void)text; }

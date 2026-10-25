@@ -47376,6 +47376,153 @@
       "timeout_s": 60,
       "note_pass": "every state file a check reads comes from a recipe (tools/fixtures/, made from the ROM), a public source (tools/third_party_saves.json, verified by SHA-256) or the shrinking list of the owner's captures still waiting for their recipes (tools/private_captures.json): no check depends on a file that exists on one machine only and is not on that list",
       "notes": "2026-10-22, the owner: nothing may depend exclusively on one machine. The suite on a fresh clone (the cloud sessions) SKIPs every check whose input is not there -- before this, 336 of 952 checks, and the number grew because nothing stopped a new check pinned on a local capture. This check fails on such a check (UNCLASSIFIED: give it a recipe or a public source) and on a list entry no check reads (STALE). Re-pin only when the private count goes DOWN (a check moved onto a recipe-made twin, docs/ROADMAP.md 1.1) or the recipe / third-party counts change with it. RE-PINNED 2026-10-22 (the attract family): saves/attract_cena_inicial.state, attract_loc0AD_flea.state, attract_race_handoff_rule_f8247.state and attract_entry3_handoff_rule_f8859.state are off the private list -- their checks read the recipe-made twins of tools/fixtures/attract_rule.json (and attract.json's attract_entry3_handoff_f6750.state) -- so 115 -> 119 recipe files, 113 -> 109 private captures, 324 -> 277 checks still on one (47 checks read no private capture any more; slot1-runner and the HDMA census keep other families' captures). || RE-PINNED 2026-10-22 (recipes-rest): saves/field_re/magus_scene.lakewram and magus_scene_lake.state made by tools/recipes/fxr_magus_scene.json and taken off tools/private_captures.json -- the rest family has no private capture left; on the merged main: 225 made by recipes, 3 private (other families' catedral_party3 and pre_scene_19f) read by 3 checks. RE-PINNED 2026-10-22 (the five recipe families merged with 4bdb397, graded in a clean-room clone -- setup from the ROM, the public saves fetched, every fixture made by its recipe): after all five families: 2 private captures left (pre_scene_19f, read by 2 checks), 226 states made by recipes, 11 public battery saves. ==== 2026-10-23, RE-PINNED DOWN TO ZERO (the late game's last two): saves/field_re/pre_scene_19f.* is made by the recipe lg_ocean_palace_19f (Jackie's ch22 played through the Ocean Palace to the aftermath; ocean-palace-aftermath-chain-vs-oracle and ow-1f5-wave-and-light-vs-oracle pass on it with their pins unchanged). No check reads a private capture any more: tools/private_captures.json is empty, and any new check on a local capture fails here as UNCLASSIFIED."
+    },
+    {
+      "name": "bugreport-report-replays-on-both-sides",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/bugreport.py",
+        "check"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/bugreport.py",
+        "tools/bugreport/boot_to_bedroom.log"
+      ],
+      "expect": [
+        "bugreport: saved 0001 frame 4700 loc 002 mode field category picture",
+        "bugreport-check: report 0001 frame 4700 loc 002 mode field: files 9/9, native 256x224 fnv 50C57E0E (report 50C57E0E), screen 256x224, wram fnv 34915603 (report 34915603), log boot 4700 frames = the drive's, 0 events, index 1 line(s), replay exact",
+        "bugreport-replay: report 0001 frame 4700: wram 131072/131072 identical, picture identical (fnv 50C57E0E)",
+        "bugreport-cartridge: SAME -- locs 000 1B1 000 1F0 10F 002 | story 00 03 | party 808080 008080 | end picture 0 px at engine -3",
+        "bugreport-check: replay engine EXACT, cartridge SAME",
+        "bugreport-check: the log without its edges: wram 97173/131072 identical (first difference $7E:0003 replay 00 report 36), picture differs (fnv 50BEFC7C, report 50C57E0E)"
+      ],
+      "pin": [
+        "^bugreport: saved",
+        "^bugreport-check: ",
+        "^bugreport-replay: ",
+        "^bugreport-cartridge: "
+      ],
+      "timeout_s": 400,
+      "note_pass": "the bug reporter (src/bugreport.c, the remaster's in-game `~`): a session from power-on on an erased cartridge, driven by tools/bugreport/boot_to_bedroom.log, reported at frame 4700 in Crono's room; the report's files, pictures and log are whole, and the report replays exactly in the engine (128 KB of work RAM and the picture) and agrees with the cartridge (locations, storyline, party, gold, HP, control, the end picture); a damaged log is graded different",
+      "notes": "2026-10-25 (CC_Remaster_Project M6, docs/BUG_REPORTER.md there). tools/bugreport.py check: Belthasar --boot headless with CT_PLAYINPUT (the drive: playthrough.py's legs 00-02 as the engine's input, one frame later, a press's edge on the frame its bit rises) and CT_BUGREPORT_AT=4700 writes report 0001 (no panel); its files, its two PNGs decoded (zlib) against its hash, wram.bin's hash, its inputs.log equal to the drive's first 4700 frames (levels and edges). Then the replay: the engine from power-on with the report's log and battery, graded by CT_REPLAY_CHECK at frame 4700 (all 128 KB and the picture), and the cartridge (ct.exe from power-on under the rule, CT_ORACLE_SRAM, the log's levels one frame earlier) graded as playthrough.py grades its legs, from each side's first lit frame. Last, the same log with its edges dropped must grade DIFFERENT (the grade can fail). The wram and picture hashes are the engine's state from power-on at frame 4700: an intentional engine change in the opening can move them; re-pin only when the replay line still reads identical and the cartridge line SAME. The old code has no CT_PLAYINPUT / CT_BUGREPORT_AT (no report line).",
+      "mutations": [
+        {
+          "file": "src/bugreport.c",
+          "find": "g_runs[g_nRuns].n = 1; g_runs[g_nRuns].level = level; g_runs[g_nRuns].edges = edges; g_nRuns++;",
+          "replace": "g_runs[g_nRuns].n = 1; g_runs[g_nRuns].level = level; g_runs[g_nRuns].edges = 0; g_nRuns++; /* MUT */",
+          "why": "the log keeps no edges: the report's log is not the session's, and its replay never presses A"
+        },
+        {
+          "file": "src/field.c",
+          "find": "static uint16_t fieldKeyPad(void) { return g_hostLevelLatched ? g_hostLevel : fieldKeyPadLive(); }",
+          "replace": "static uint16_t fieldKeyPad(void) { return fieldKeyPadLive(); } /* MUT */",
+          "why": "the game's readers never see the frame's level: a replayed session holds no button, so the drive's game is another"
+        },
+        {
+          "file": "src/bugreport.c",
+          "find": "while (g_playCur + 1 < g_nPlay && g_play[g_playCur + 1].at <= k) g_playCur++;",
+          "replace": "while (g_playCur + 1 < g_nPlay && g_play[g_playCur + 1].at < k) g_playCur++; /* MUT */",
+          "why": "each run of the log starts a frame late in the replay"
+        },
+        {
+          "file": "src/field.c",
+          "find": "talkPressed = !!(ed & CT_BUG_EDGE_A);",
+          "replace": "talkPressed = 0; /* MUT */",
+          "why": "the replay drops A's presses: Mom's lines are never dismissed"
+        },
+        {
+          "file": "src/field.c",
+          "find": "bf.frame = g_bugFrame; bf.hostFrame = hostFrame;",
+          "replace": "bf.frame = g_bugFrame + 1; bf.hostFrame = hostFrame; /* MUT */",
+          "why": "the report names a frame past its state: the replay is graded a frame late"
+        },
+        {
+          "file": "src/bugreport.c",
+          "find": "bput32(&b, s2 << 16 | s1);",
+          "replace": "bput32(&b, s2 << 16 | (s1 ^ 1)); /* MUT */",
+          "why": "the PNG's zlib stream fails its checksum: the pictures do not decode"
+        },
+        {
+          "file": "src/bugreport.c",
+          "find": "if (wram[i] == g_chkWram[i]) same++; else if (first < 0) first = i;",
+          "replace": "same++; /* MUT */",
+          "why": "a grade that cannot fail on the work RAM: the damaged log reads identical there"
+        }
+      ]
+    },
+    {
+      "name": "bugreport-panel-takes-a-report",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/bugreport.py",
+        "check-panel"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/bugreport.py",
+        "tools/bugreport/boot_to_bedroom.log"
+      ],
+      "expect": [
+        "bugreport: saved 0001 frame 3200 loc 002 mode field category other",
+        "bugreport: saved 0002 frame 4059 loc 002 mode field category other (note to add)",
+        "bugreport: saved 0001 frame 4500 loc 002 mode field category other",
+        "bugreport-check: panel report 0001 frame 3200 note \"the bed's shadow is one pixel off\" category other, screen 512x448 (the window; picture 256 wide at x1), report 0001 frame 3200: wram 131072/131072 identical, picture identical (fnv F5E6300B)",
+        "bugreport-check: panel report 0002 frame 4059 note \"\" (note to add) category other, screen 512x448 (the window; picture 256 wide at x1), report 0002 frame 4059: wram 131072/131072 identical, picture identical (fnv 7915CFFC)",
+        "bugreport-check: panel report 0001 frame 4500 note \"16:9 at 2x\" category other, screen 796x448 (the window; picture 398 wide at x2), report 0001 frame 4500: wram 131072/131072 identical, picture identical (fnv DC261A2F)",
+        "bugreport-check: console.txt holds the session's start"
+      ],
+      "pin": [
+        "^bugreport: saved",
+        "^bugreport-check: "
+      ],
+      "timeout_s": 600,
+      "note_pass": "the bug reporter's player side: `~` opens the panel over the paused game, a note typed into it is saved with the report, the DualSense's touchpad held a second takes one with no note, the window as drawn is the report's screen.png, the console is kept; every report replays exactly with every mod off -- the second after the panel's pause, the third from a session in 16:9 at 2x internal resolution",
+      "notes": "2026-10-25 (CC_Remaster_Project M6). tools/bugreport.py check-panel: the drive of bugreport-report-replays-on-both-sides under the interactive presentation without a window (CT_BUGKEYS with CT_NOPACE, the dummy video driver, the overlay's ImGui, CT_BUG_CONSOLE): at frame 3200 the events of `~` (SDL_SCANCODE_GRAVE and its typed character), the panel's text box filled by text events and Enter on its third frame (CT_BUGPANEL_TYPE); at frame 4000 the touchpad button's press, held: a report at its 60th frame (4059), note to add. A second session in widescreen 16:9 at 2x internal resolution (CT_SETTINGS) reports at 4500: its screen.png is the 796x448 window, its 256x224 picture the middle of the 398-wide frame. Each report replayed headless in the engine (CT_REPLAY_CHECK), where every mod is off: identical work RAM and picture is the presentation leaving the game alone (the render-independence check of PLAN Phase 8, in miniature). Not graded: the panel's SDL_FlushEvent (defensive: on Windows the character `~` types comes in the key's own batch of events, which the main loop takes) and the buttons kept from the game while the keys that closed the panel are still down (pushed events do not move SDL's keyboard state). Needs third_party/imgui. The old code has no reporter (no report line).",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "if (g_bugTouchDown) { if (++bugTouchFrames == 60) want = 1; }",
+          "replace": "if (g_bugTouchDown) { if (++bugTouchFrames == 30) want = 1; } /* MUT */",
+          "why": "the touchpad's report after half a second"
+        },
+        {
+          "file": "src/field.c",
+          "find": "  if (pr && g_hostInteractive) {\n    const char* tmp = \"ct_bugreport_screen.bmp\";",
+          "replace": "  if (0) { /* MUT */\n    const char* tmp = \"ct_bugreport_screen.bmp\";",
+          "why": "screen.png is the uploaded 256x224 picture, not the window the player saw"
+        },
+        {
+          "file": "src/field.c",
+          "find": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE) { bugReq = 1; continue; }",
+          "replace": "if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE) { continue; } /* MUT */",
+          "why": "`~` opens nothing: one report, not two"
+        },
+        {
+          "file": "src/overlay.cpp",
+          "find": "ImGuiInputTextFlags_EnterReturnsTrue)) r = 1;",
+          "replace": "ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_ReadOnly)) r = 1; /* MUT */",
+          "why": "the panel's box takes no text: the note is empty"
+        },
+        {
+          "file": "src/bugreport_console.c",
+          "find": "    ringAppend(buf, (size_t)n);",
+          "replace": "    /* MUT: nothing kept */",
+          "why": "the console's lines go on to the console but not into the ring: console.txt is empty"
+        },
+        {
+          "file": "src/field.c",
+          "find": "  int x0 = (g_lastShownW - CAMW) / 2;",
+          "replace": "  int x0 = 0; /* MUT */",
+          "why": "the 256x224 picture of a widescreen frame is its left edge, not its middle: the 16:9 report's picture is not the replay's"
+        }
+      ]
     }
   ],
   "excluded": [

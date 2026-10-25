@@ -1,6 +1,7 @@
 // overlay.cpp - the F1 options overlay: Dear ImGui (third_party/imgui, tools/get_imgui.ps1) over the paused game,
 // on the SDL_Renderer the game presents with. See overlay.h. Edits settings.h's options; the host applies them.
 #include "overlay.h"
+#include "bugreport.h"
 #include "settings.h"
 #include "touchpad.h"
 #include "imgui.h"
@@ -310,6 +311,62 @@ extern "C" int CtOverlayFrame(void) {
   ImGui::End();
   ImGui::Render();
   return ch;
+}
+
+// ---- the bug reporter's panel (overlay.h, bugreport.h) ------------------------------------------------------------
+static int g_bugFocus;                                     // frames left to put the cursor in the text box
+extern "C" void CtOverlayBugPanelOpen(void) { g_bugFocus = 2; }
+extern "C" int CtOverlayBugPanel(char* note, int noteN, int* category) {
+  if (!g_ok) return -1;
+  int r = 0;
+#ifdef CT_HAVE_VULKAN
+  if (g_vk) ImGui_ImplVulkan_NewFrame(); else
+#endif
+  if (g_gl) ImGui_ImplOpenGL3_NewFrame(); else ImGui_ImplSDLRenderer2_NewFrame();
+  ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+  ImGui_ImplSDL2_NewFrame();
+  ImGui::NewFrame();
+  const ImGuiViewport* vp = ImGui::GetMainViewport();
+  float w = vp->WorkSize.x * 0.7f; if (w < 380) w = vp->WorkSize.x;
+  ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + vp->WorkSize.y * 0.3f),
+                          ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(w, 0), ImGuiCond_Always);
+  ImGui::Begin("Bug report", NULL, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+               ImGuiWindowFlags_NoSavedSettings);
+  ImGui::TextUnformatted("What went wrong?");
+  if (g_bugFocus > 0) { ImGui::SetKeyboardFocusHere(); g_bugFocus--; }
+  ImGui::SetNextItemWidth(-1);
+  if (ImGui::InputText("##note", note, (size_t)noteN, ImGuiInputTextFlags_EnterReturnsTrue)) r = 1;
+  if (*category < 0 || *category >= CT_BUG_NCAT) *category = CT_BUG_NCAT - 1;
+  ImGui::Combo("Category", category, g_ctBugCategories, CT_BUG_NCAT);
+  ImGui::TextDisabled("Enter saves, Esc cancels. The game is paused; nothing in it changes.");
+  if (ImGui::Button("Save")) r = 1;
+  ImGui::SameLine();
+  if (ImGui::Button("Cancel")) r = -1;
+  if (!r && ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) r = 1;
+  if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) r = -1;
+  ImGui::End();
+  ImGui::Render();
+  return r;
+}
+// ...and its line at the top of the picture: a frame of its own, like the virtual gamepad's.
+extern "C" void CtOverlayToast(const char* text) {
+  if (!g_ok || !text || !*text) return;
+#ifdef CT_HAVE_VULKAN
+  if (g_vk) ImGui_ImplVulkan_NewFrame(); else
+#endif
+  if (g_gl) ImGui_ImplOpenGL3_NewFrame(); else ImGui_ImplSDLRenderer2_NewFrame();
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;   // (the host hides the cursor during play)
+  ImGui_ImplSDL2_NewFrame();
+  ImGui::NewFrame();
+  ImDrawList* dl = ImGui::GetForegroundDrawList();
+  const ImGuiIO& io = ImGui::GetIO();
+  ImVec2 ts = ImGui::CalcTextSize(text);
+  float pad = ImGui::GetFontSize() * 0.5f, x = (io.DisplaySize.x - ts.x) * 0.5f, y = pad * 2;
+  dl->AddRectFilled(ImVec2(x - pad, y - pad), ImVec2(x + ts.x + pad, y + ts.y + pad), IM_COL32(20, 20, 24, 210), pad);
+  dl->AddText(ImVec2(x, y), IM_COL32(255, 255, 255, 255), text);
+  ImGui::Render();
+  CtOverlayRender();
 }
 
 // The virtual gamepad: a frame of ImGui of its own (no window, only the foreground draw list), drawn over the picture.

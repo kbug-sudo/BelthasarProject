@@ -24,6 +24,7 @@ peek dumps; it never alters engine behavior (see the no-invention mandate in
 | `python tools/fixtures.py {list,make,diff} [paths]` | The suite's state fixtures, made from recipes (`tools/fixtures/<domain>.json` -> `tools/recipes/`); `make all` makes every one. |
 | `python tools/input_provenance.py [--list] [--write]` | Where every state file a check reads comes from (recipe, public source, or `tools/private_captures.json`); the check `inputs-come-from-recipes-or-sources`. |
 | `python tools/playthrough.py cmp all` | The playthrough: one route from power-on (`tools/playthrough/route.txt`), graded leg by leg against the rule's cartridge; `try`, `walk`, `scene`, `diff` help write and inspect legs. |
+| `python tools/bugreport.py replay <report>` | The bug reporter's reports (src/bugreport.h): a session from power-on replayed in the engine (exactly, against the report) and on the cartridge (the chains and the end picture), with the verdict; `check` and `check-panel` are the reporter's own checks. |
 | `python tools/walkto.py` | Oracle-driven pathfinder for building fixtures and legs: a d-pad drive that walks the lead to a target pixel or through an exit, probing the oracle itself. |
 | `python tools/attract_divergence.py [--vehicle boot] [--visit LOC]` | The whole attract demo against the rule's cartridge, frame by frame; `build/_divergence/latest/report.html`. The `attract-divergence` agent runs it. |
 | `python tools/battle_ab.py` | The battle census: fights enemies on both sides and compares spans, effects and the return to the field. |

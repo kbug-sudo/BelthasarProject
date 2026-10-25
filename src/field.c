@@ -44,6 +44,7 @@
 #include "objslot.h"     // FD/E292 + FD/E39C: the location's colour animation records
 #include "settings.h"    // the player's options (ct_settings.ini), edited by the F1 overlay
 #include "overlay.h"     // the F1 options overlay (Dear ImGui; a stub without third_party/imgui)
+#include "bugreport.h"   // the bug reporter (`~`): the session's input log, its reports and their replay
 #include "touchpad.h"    // the on-screen virtual gamepad (a player option; on by default on Android only)
 #ifdef __ANDROID__
 #include "android.h"     // where the player's ROM, ct_assets.dat, save and options live on the device
@@ -242,11 +243,14 @@ static void hostDstRect(CtPresenter* pr, SDL_Rect* r) {
 // g_padUsed: a controller's button or stick moved since the last touch -- a phone's own keys can enumerate as a
 // controller (the emulator's keyboard has a d-pad source), so being connected is not enough to hide the touch pad.
 static int g_touchOn = 0, g_hostInOptions = 0, g_padUsed = 0;
+static char g_bugToast[64]; static Uint32 g_bugToastUntil;   // the bug reporter's "Bug report 0007 saved", for two seconds
 static void hostDrawPicture(CtPresenter* pr) {
   if (g_hostInteractive) { SDL_Rect d; hostDstRect(pr, &d); CtPresentDraw(pr, &d, CtSettingsGet()->linearFilter);
     if (g_touchOn && !g_hostInOptions) {
       int ow = 0, oh = 0; CtPresentOutputSize(pr, &ow, &oh); CtTouchPadSetOutput(ow, oh);
-      CtTouchDraw td; CtTouchPadBuild(&td); CtOverlayTouchDraw(&td); } }
+      CtTouchDraw td; CtTouchPadBuild(&td); CtOverlayTouchDraw(&td); }
+    if (g_bugToastUntil && !g_hostInOptions) {
+      if (SDL_TICKS_PASSED(SDL_GetTicks(), g_bugToastUntil)) g_bugToastUntil = 0; else CtOverlayToast(g_bugToast); } }
   else CtPresentDraw(pr, NULL, 0);
 }
 // The window's size for the options: the picture at `windowScale` (4:3 widens it).
@@ -4717,6 +4721,7 @@ static CtWram* fieldWram(void) { if (!g_wram) g_wram = CtWramCreate(); return g_
 // the path, which is what lets a headless check save into build/ instead of the repo root.
 #define CT_SRAM_BYTES 0x2000
 static uint8_t g_sram[CT_SRAM_BYTES];
+static uint8_t g_sramStart[CT_SRAM_BYTES];      // the image as loaded, before the session saved anything (a bug report's)
 static int g_sramReady = 0;
 static const char* fieldSramPath(void) {
   const char* p = getenv("CT_SRAM");
@@ -4735,6 +4740,7 @@ static uint8_t* fieldSram(void) {
       FILE* f = fopen(fieldSramPath(), "rb");
       if (f) { size_t n = fread(g_sram, 1, sizeof g_sram, f); (void)n; fclose(f); }
     }
+    memcpy(g_sramStart, g_sram, sizeof g_sram);
     g_sramReady = 1;
   }
   return g_sram;
@@ -4917,7 +4923,7 @@ static uint16_t fieldTouchPad(void) {
   for (int b = 0; b < CT_BTN_COUNT; b++) if (m & (1u << b)) ob |= PAD_OF_BTN[b];
   return ob;
 }
-static uint16_t fieldKeyPad(void) {
+static uint16_t fieldKeyPadLive(void) {
   const Uint8* kb = SDL_GetKeyboardState(NULL);   // whatever a human is holding
   const CtSettings* st = CtSettingsGet();
   uint16_t ob = 0;
@@ -4933,6 +4939,11 @@ static uint16_t fieldKeyPad(void) {
   ob |= fieldTouchPad();
   return ob;
 }
+// THE FRAME'S LEVEL, TAKEN ONCE (the bug reporter's input log, bugreport.h): the main loop latches fieldKeyPadLive after
+// its events and every reader below gets that word -- what it read anyway, SDL's state changing only when events are
+// pumped -- or, replaying a log (CT_PLAYINPUT), the log's word for the frame. Before the first latch: the live state.
+static uint16_t g_hostLevel; static int g_hostLevelLatched;
+static uint16_t fieldKeyPad(void) { return g_hostLevelLatched ? g_hostLevel : fieldKeyPadLive(); }
 // The pad buttons a key event names (0 = none): the EDGE half of fieldKeyPad, for the event loop.
 static uint16_t fieldKeyPadOf(SDL_Scancode sc) {
   const CtSettings* st = CtSettingsGet();
@@ -10158,6 +10169,164 @@ static int fieldOptionsModal(CtPresenter* pr, SDL_AudioDeviceID dev) {
   return quit;
 }
 
+// ---- THE BUG REPORTER (bugreport.h; the remaster's docs/BUG_REPORTER.md) -----------------------------------------
+// A host feature like the options: it reads the game and writes nothing of it. The main loop keeps the session's input
+// log (its "THE BUG REPORTER" block) and takes a report on `~`, on a second of the DualSense's touchpad button, or at
+// CT_BUGREPORT_AT's frame.
+static long g_bugFrame = 0;                        // the session's frame: the main loop's passes since it started
+static int g_bugPlay = 0;                          // CT_PLAYINPUT: this run's input is a log's, not SDL's
+static int g_bugTouchDown = 0;                     // the DualSense's touchpad button is down (its events)
+static uint16_t g_bugHeldMask = 0;                 // the buttons held as the panel closed (Enter is Start's key): kept
+                                                   //   from the game until they are let go
+// The 256x224 picture the game composed last: the middle 256 columns of a widescreen one, which are the vanilla picture
+// (tools/widescreen_check.py). Black before the first.
+static void hostNativePicture(uint8_t* out) {
+  memset(out, 0, (size_t)CAMW * CAMH * 3);
+  if (!g_lastShown) return;
+  int x0 = (g_lastShownW - CAMW) / 2;
+  if (x0 < 0) x0 = 0;
+  for (int y = 0; y < CAMH; y++) memcpy(out + (size_t)y * CAMW * 3, g_lastShown + ((size_t)y * g_lastShownW + x0) * 3, (size_t)CAMW * 3);
+}
+// What the player saw, RGB24 (malloc'd): the window as the presenter drew it -- drawn again, since a back buffer is
+// undefined after its swap -- else the picture the host uploaded last. NULL = none.
+static uint8_t* hostScreenPicture(CtPresenter* pr, int* w, int* h) {
+  *w = *h = 0;
+  if (pr && g_hostInteractive) {
+    const char* tmp = "ct_bugreport_screen.bmp";
+    hostDrawPicture(pr);
+    if (CtPresentSaveBMP(pr, tmp)) {
+      SDL_Surface* s = SDL_LoadBMP(tmp); remove(tmp);
+      SDL_Surface* c = s ? SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+      if (s) SDL_FreeSurface(s);
+      if (c) {
+        uint8_t* o = (uint8_t*)malloc((size_t)c->w * c->h * 3);
+        if (o) { for (int y = 0; y < c->h; y++) memcpy(o + (size_t)y * c->w * 3, (uint8_t*)c->pixels + (size_t)y * c->pitch, (size_t)c->w * 3);
+                 *w = c->w; *h = c->h; }
+        SDL_FreeSurface(c);
+        if (o) return o;
+      }
+    }
+  }
+  if (g_hostLastUp && g_hostLastUpW > 0 && g_hostLastUpH > 0) {
+    size_t n = (size_t)g_hostLastUpW * g_hostLastUpH * 3;
+    uint8_t* o = (uint8_t*)malloc(n);
+    if (o) { memcpy(o, g_hostLastUp, n); *w = g_hostLastUpW; *h = g_hostLastUpH; }
+    return o;
+  }
+  return NULL;
+}
+// The options in force, as report.json's members. `interactive` 0 = a headless run: every mod is off whatever they say.
+static void hostBugOptions(CtPresenter* pr, char* o, size_t n) {
+  const CtSettings* st = CtSettingsGet();
+  int ow = 0, oh = 0; if (pr) CtPresentOutputSize(pr, &ow, &oh);
+  char nm[160]; snprintf(nm, sizeof nm, "%s", pr ? CtPresentName(pr) : "none");
+  for (char* q = nm; *q; q++) if (*q == '"' || *q == '\\' || (unsigned char)*q < 0x20) *q = '\'';
+  snprintf(o, n, "\"interactive\": %d, \"presenter\": \"%s\", \"backend\": %d, \"window\": [%d, %d], \"fullscreen\": %d, "
+                 "\"widescreen\": %d, \"picture_width\": %d, \"render_scale\": %d, \"frames_between\": %d, \"scale_mode\": %d, "
+                 "\"aspect\": %d, \"filter\": %d, \"vsync\": %d, \"sync\": \"%s\", \"instant_uploads\": %d",
+           g_hostInteractive, nm, st->backend, ow, oh, st->fullscreen, st->widescreen, hostWideW(), st->renderScale,
+           st->interpolate, st->scaleMode, st->aspect, st->linearFilter, st->vsync,
+           st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads);
+}
+// An option the overlay changed, in the log: the ones that change the game's timing (free sync, instant uploads) make
+// the session's replay approximate from there -- a headless replay runs neither.
+static void hostBugOptionsChanged(const CtSettings* before) {
+  const CtSettings* st = CtSettingsGet();
+  if (before->sync == st->sync && before->instantUploads == st->instantUploads && before->widescreen == st->widescreen &&
+      before->renderScale == st->renderScale && before->interpolate == st->interpolate) return;
+  CtBugEvent(!(hostSyncFree() || hostSoundInstant()), "option sync=%s instant_uploads=%d widescreen=%d render_scale=%d frames_between=%d",
+             st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads, st->widescreen, st->renderScale, st->interpolate);
+}
+// The panel, modal like the options (fieldOptionsModal): 1 = save, 0 = cancelled, -1 = the window closed.
+static int fieldBugModal(CtPresenter* pr, SDL_AudioDeviceID dev, char* note, int noteN, int* cat) {
+  if (dev) SDL_PauseAudioDevice(dev, 1);
+  SDL_FlushEvent(SDL_TEXTINPUT);                     // (a `~` typed late would be typed into the box: defensive -- on
+                                                     //  Windows the character comes in the key's own batch of events,
+                                                     //  which the main loop has already taken)
+  g_hostInOptions = 1; CtTouchPadReset();
+  SDL_ShowCursor(SDL_ENABLE);
+  CtOverlayBugPanelOpen();
+  // CT_BUGPANEL_TYPE=<text> (test): typed into the panel on its third frame, then Enter -- the events a player's keys
+  // give, so the run takes the panel's whole path (tools/bugreport.py check-panel).
+  const char* ty = getenv("CT_BUGPANEL_TYPE");
+  Uint32 wid = SDL_GetWindowID(CtPresentWindow(pr));
+  int r = 0, quit = 0;
+  for (int n = 0; !r; n++) {
+    if (ty && n == 3) {
+      SDL_Event ev; size_t len = strlen(ty);
+      for (size_t i = 0; i < len; ) {
+        size_t k = len - i < 24 ? len - i : 24;
+        memset(&ev, 0, sizeof ev); ev.type = SDL_TEXTINPUT; ev.text.windowID = wid; memcpy(ev.text.text, ty + i, k);
+        SDL_PushEvent(&ev); i += k;
+      }
+      memset(&ev, 0, sizeof ev); ev.type = SDL_KEYDOWN; ev.key.windowID = wid; ev.key.state = SDL_PRESSED;
+      ev.key.keysym.scancode = SDL_SCANCODE_RETURN; ev.key.keysym.sym = SDLK_RETURN; SDL_PushEvent(&ev);
+    }
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+      if (e.type == SDL_QUIT) { quit = 1; r = -1; }
+      else if (e.type == SDL_CONTROLLERDEVICEADDED) fieldPadOpen();
+      CtOverlayProcessEvent(&e);
+    }
+    if (!r) r = CtOverlayBugPanel(note, noteN, cat);
+    hostDrawPicture(pr);
+    CtOverlayRender();
+    { const char* sh = getenv("CT_BUGPANEL_SHOT");     // (probe) the window with the panel, the frame the text arrives
+      if (sh && *sh && n == 3) CtPresentSaveBMP(pr, sh); }
+    CtPresentSwap(pr);
+    if (!CtSettingsGet()->vsync || g_noPace) SDL_Delay(g_noPace ? 1 : 16);
+    if (ty && n > 600) { fprintf(stderr, "[bugreport] the panel took no answer in 600 frames\n"); r = -1; }
+  }
+  g_hostInOptions = 0; CtTouchPadReset();
+  g_hostCursorMoveMs = SDL_GetTicks();
+  g_hostT0 = -1.0; g_hostFrames = 0;                 // the pause is not a stall to catch up on
+  if (dev) { SDL_ClearQueuedAudio(dev); SDL_PauseAudioDevice(dev, 0); }
+  return quit ? -1 : r > 0;
+}
+// Take a report now (CtBugReportWrite). Nothing of this pass has run yet, so its state is the end of the frame before and
+// its picture the one on the screen. `panel`: the note is asked for first (`~`); else it is taken at once with `note`.
+// Returns the report's number, 0 = none written, -1 = the window was closed over the panel.
+static int hostBugReport(CtPresenter* pr, SDL_AudioDeviceID dev, CtScene* vm, const char* mode, long hostFrame, int haveLead,
+                         double lx, double ly, int lz, int lfac, int panel, const char* note, const char* cat, const char* exe) {
+  static uint8_t native[CAMW * CAMH * 3];
+  hostNativePicture(native);
+  int sw = 0, sh = 0;
+  uint8_t* screen = hostScreenPicture(pr, &sw, &sh);
+  char text[1024]; snprintf(text, sizeof text, "%s", note ? note : "");
+  int ci = CT_BUG_NCAT - 1;
+  for (int i = 0; cat && i < CT_BUG_NCAT; i++) if (!strcmp(cat, g_ctBugCategories[i])) ci = i;
+  if (panel) {
+    int r = fieldBugModal(pr, dev, text, (int)sizeof text, &ci);
+    g_bugHeldMask = fieldKeyPadLive();               // (the keys that closed it, still down)
+    if (r <= 0) { free(screen); fprintf(stderr, "[bugreport] %s\n", r < 0 ? "the window closed" : "cancelled"); return r < 0 ? -1 : 0; }
+  }
+  uint8_t* w = CtWramSys(fieldWram());
+  char opt[1024]; hostBugOptions(pr, opt, sizeof opt);
+  CtBugFacts bf; memset(&bf, 0, sizeof bf);
+  bf.note = text; bf.noteToAdd = !text[0]; bf.category = g_ctBugCategories[ci];
+  bf.frame = g_bugFrame; bf.hostFrame = hostFrame; bf.mode = mode; bf.location = (w[0x100] | w[0x101] << 8) & 0x1FF;
+  bf.haveLead = haveLead; bf.leadX = lx; bf.leadY = ly; bf.leadZ = lz; bf.leadFacing = lfac;
+  bf.wram = w; bf.screen = screen; bf.screenW = sw; bf.screenH = sh; bf.native = native; bf.options = opt; bf.exePath = exe;
+  char dir[1100];
+  int num = CtBugReportWrite(&bf, dir, sizeof dir);
+  free(screen);
+  if (!num) return 0;
+  if (vm) {                                          // F5's snapshot of the scene and the sound; F9 goes straight there
+    char sp[1200], ap[1220]; double plr[4] = { lx, ly, (double)lz, (double)lfac };
+    snprintf(sp, sizeof sp, "%s/scene.state", dir); snprintf(ap, sizeof ap, "%s.apu", sp);
+    if (CtSceneSaveState(vm, sp, plr) && g_fieldAudio) CtAudioSaveState(g_fieldAudio, ap);
+    if (g_hostInteractive && !getenv("CT_BUGKEYS") &&               // (a player's run; not the probe's, in the repo root)
+        CtSceneSaveState(vm, "ct_debug.state", plr) && g_fieldAudio) CtAudioSaveState(g_fieldAudio, "ct_debug.state.apu");
+  }
+  snprintf(g_bugToast, sizeof g_bugToast, "Bug report %04d saved", num);
+  g_bugToastUntil = SDL_GetTicks() + 2000;
+  printf("bugreport: saved %04d frame %ld loc %03X mode %s category %s%s\n", num, g_bugFrame, bf.location, mode,
+         bf.category, bf.noteToAdd ? " (note to add)" : "");
+  fprintf(stderr, "[bugreport] %s: %s\n", g_bugToast, dir);
+  fflush(stdout);
+  return num;
+}
+
 int main(int argc, char** argv) {
 #ifdef __APPLE__
   int macStatus = CtMacConfigure(&argc, &argv);
@@ -11653,8 +11822,12 @@ int main(int argc, char** argv) {
   // dummy video driver) keeps the defaults, so nothing a player saved can move a regression check.
   { const char* vd = SDL_GetCurrentVideoDriver();
     g_hostInteractive = !selftest && !g_noPace && !(vd && !strcmp(vd, "dummy"));
-    if (getenv("CT_OVERLAY_SHOT")) g_hostInteractive = 1; }   // (the probe below: the overlay without a visible window)
+    if (getenv("CT_OVERLAY_SHOT")) g_hostInteractive = 1;     // (the probe below: the overlay without a visible window)
+    if (getenv("CT_BUGKEYS") && getenv("CT_NOPACE")) g_hostInteractive = 1; }   // (test: the bug panel, as above)
   CtSettingsLoad(g_hostInteractive);
+  // the console's last lines for a bug report (bugreport_console.c): an interactive run's (or CT_BUG_CONSOLE's) output is
+  // teed into a ring; a headless run's stays exactly as it was
+  if ((g_hostInteractive && !getenv("CT_BUGKEYS")) || getenv("CT_BUG_CONSOLE")) CtBugConsoleStart();
 #ifdef __ANDROID__
   { CtSettings* st = CtSettingsGet(); st->fullscreen = 1; st->backend = CT_BACKEND_SDL; }   // the screen; OpenGL ES
 #endif
@@ -11783,7 +11956,7 @@ int main(int argc, char** argv) {
     const CtSettings* st = CtSettingsGet();
     hostWindowSize(&pc.w, &pc.h);
     pc.fullscreen = st->fullscreen; pc.backend = st->backend; pc.sdlDriver = st->renderDriver; pc.vsync = st->vsync;
-    pc.hidden = getenv("CT_OVERLAY_SHOT") != NULL;     // (the probe: no window on the player's screen)
+    pc.hidden = getenv("CT_OVERLAY_SHOT") != NULL || getenv("CT_BUGKEYS") != NULL;   // (the probes: no window on the player's screen)
   }
   CtPresenter* pr = CtPresentCreate(&pc);
   if (!pr) { printf("FAIL: no window: %s\n", SDL_GetError()); return 4; }
@@ -12207,6 +12380,21 @@ int main(int argc, char** argv) {
       fade = 1;
       printf("reboot: JML C0:0000 -> loc %03X tile(%d,%d) bits%02X\n", rl, rtx, rty, rb); }
   }
+  // THE BUG REPORTER'S SESSION (bugreport.h): its log starts with the main loop's first pass, from this start and the
+  // battery as it was loaded; a replay's log (CT_PLAYINPUT) is read here. Only a power-on can be replayed on both sides.
+  { CtBugSessionStart(powerOn ? "boot" : loadStatePath ? "loadstate" : wramSeeded ? "loadwram" : "scene", g_sramStart,
+                      g_sramReady ? CT_SRAM_BYTES : 0);
+    if (walkScript || playScript) CtBugEvent(0, "a scripted drive (--walkscript / --play) feeds the game beside this log");
+    if (hostSyncFree() || hostSoundInstant())
+      CtBugEvent(0, "option sync=%s instant_uploads=%d", CtSettingsGet()->sync == CT_SYNC_FREE ? "free" : "frame-perfect",
+                 CtSettingsGet()->instantUploads);
+    const char* pi = getenv("CT_PLAYINPUT");
+    if (pi && *pi) {
+      char err[400];
+      if (!CtBugPlayOpen(pi, err, sizeof err)) { printf("bugreport-replay: FAIL %s\n", err); fflush(stdout); return 2; }
+      g_bugPlay = 1;
+      fprintf(stderr, "[bugreport] replaying %s: %ld frames\n", pi, CtBugPlayFrames());
+    } }
   while (running && !g_shotsExit) {
     fieldIrqPreFlip = 0;                             // set by this frame's return-chain wait, if any (the battle's ack)
     // C0/000E, THE COLD INIT, reached from a running game this frame (the demo battle's CF/E702, the defeat's C0/02CA):
@@ -12219,18 +12407,41 @@ int main(int argc, char** argv) {
                                                      // pipeline frame with no C0/00BF in it -> no VM tick)
     SDL_Event e;
     int optionsReq = 0;                              // F1 (or the controller's Guide): the options overlay, this pass
+    int bugReq = 0;                                  // `~`: the bug reporter's panel, this pass
     g_touchOn = g_hostInteractive && CtTouchPadEnabled(g_padUsed);
     CtTouchPadNewFrame();
+    // CT_BUGKEYS=<frame>:grave|touch,... (test): at the session's frame, the events of `~` (its key and the character it
+    // types) or of the touchpad button's press -- the player's own events, so the run takes the reporter's whole path.
+    { static const char* bk = (const char*)1;
+      if (bk == (const char*)1) bk = getenv("CT_BUGKEYS");
+      for (const char* q = bk; q && *q; ) {
+        long at = -1; char what[16] = "";
+        if (sscanf(q, "%ld:%15[a-z]", &at, what) == 2 && at == g_bugFrame) {
+          SDL_Event ev; memset(&ev, 0, sizeof ev);
+          if (!strcmp(what, "grave")) {
+            ev.type = SDL_KEYDOWN; ev.key.state = SDL_PRESSED; ev.key.keysym.scancode = SDL_SCANCODE_GRAVE;
+            ev.key.keysym.sym = SDLK_BACKQUOTE; SDL_PushEvent(&ev);
+            memset(&ev, 0, sizeof ev); ev.type = SDL_TEXTINPUT; ev.text.text[0] = '`'; SDL_PushEvent(&ev);
+          } else if (!strcmp(what, "touch")) {
+            ev.type = SDL_CONTROLLERBUTTONDOWN; ev.cbutton.button = SDL_CONTROLLER_BUTTON_TOUCHPAD; ev.cbutton.state = SDL_PRESSED;
+            SDL_PushEvent(&ev);
+          }
+        }
+        q = strchr(q, ','); if (q) q++;
+      } }
     while (SDL_PollEvent(&e)) {
       hostCursorEvent(&e);
       if (e.type == SDL_QUIT) running = 0;           // window X: quit ONLY (never resolves a battle -- see battlePhase)
       else if (e.type == SDL_CONTROLLERDEVICEADDED) fieldPadOpen();
       else if (e.type == SDL_CONTROLLERDEVICEREMOVED) {
         if (g_pad && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(g_pad)) == e.cdevice.which) {
-          SDL_GameControllerClose(g_pad); g_pad = NULL; g_padUsed = 0; fieldPadOpen(); } }
+          SDL_GameControllerClose(g_pad); g_pad = NULL; g_padUsed = 0; g_bugTouchDown = 0; fieldPadOpen(); } }
       else if (e.type == SDL_CONTROLLERBUTTONDOWN) {
         if (!g_padUsed) { g_padUsed = 1; CtTouchPadReset(); }   // the controller in use: the touch pad hides
         if (e.cbutton.button == SDL_CONTROLLER_BUTTON_GUIDE && CtOverlayAvailable()) { optionsReq = 1; continue; }
+        // the DualSense's touchpad button, held a second: a bug report at once (the reporter's block, below). Unbound in
+        // the game by default -- Create, the other free-looking button, is the SNES's Select.
+        if (e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD) g_bugTouchDown = 1;
         uint16_t pb = fieldPadButtonOf(e.cbutton.button);   // the same edges a key gives (below)
         if (pb & PAD_A) { talkPressed = 1; nmType = 1; }
         if (pb & PAD_UP) upPressed = 1;
@@ -12240,6 +12451,7 @@ int main(int argc, char** argv) {
         if (pb & PAD_ST) nmOk = 1;
         if (pb & PAD_B) nmDel = 1;
       }
+      else if (e.type == SDL_CONTROLLERBUTTONUP && e.cbutton.button == SDL_CONTROLLER_BUTTON_TOUCHPAD) g_bugTouchDown = 0;
       else if (e.type == SDL_FINGERDOWN || e.type == SDL_FINGERMOTION || e.type == SDL_FINGERUP) {
         // the virtual gamepad's fingers (its buttons' edges are made below, like the stick's); its MENU button = F1.
         // A touch brings it back after a controller hid it.
@@ -12254,6 +12466,7 @@ int main(int argc, char** argv) {
         // are EDGE flags (talk/nav/name/F8), so only the FRESH press counts (ROM $00F6 edge-detect). Held
         // MOVEMENT is unaffected -- it reads SDL_GetKeyboardState (level), not these events.
         int k = e.key.keysym.sym;
+        if (e.key.keysym.scancode == SDL_SCANCODE_GRAVE) { bugReq = 1; continue; }   // `~`, by its place: any layout
         if (k == SDLK_F1 && CtOverlayAvailable()) { optionsReq = 1; continue; }
 #ifdef __ANDROID__
         if (k == SDLK_AC_BACK && CtOverlayAvailable()) { optionsReq = 1; continue; }   // the Back button: the options
@@ -12293,7 +12506,11 @@ int main(int argc, char** argv) {
 #ifdef __APPLE__
     if (CtMacTakeSettingsRequest() && CtOverlayAvailable()) optionsReq = 1;
 #endif
-    if (optionsReq && fieldOptionsModal(pr, audioDev)) running = 0;
+    if (optionsReq) {
+      CtSettings before = *CtSettingsGet();
+      if (fieldOptionsModal(pr, audioDev)) running = 0;
+      hostBugOptionsChanged(&before);                // (the bug reporter's log: an option that changes the timing)
+    }
     // CT_OVERLAY_SHOT=<out.bmp>[@frame][:tab] (probe): at that frame (default 60) draw the overlay over the picture on
     // tab 0..3, save the window as a BMP and leave -- how the overlay is checked headless (SDL_VIDEODRIVER=dummy).
     { const char* os = getenv("CT_OVERLAY_SHOT");
@@ -12309,6 +12526,66 @@ int main(int argc, char** argv) {
           CtPresentSaveBMP(pr, path);
           printf("overlay-shot: f%d tab %d -> %s (%dx%d)\n", frameNo, tab, path, ow, oh);
           running = 0; } } }
+    // ---- THE BUG REPORTER (bugreport.h; the remaster's docs/BUG_REPORTER.md) ----
+    // THIS FRAME'S INPUT, TAKEN ONCE: the level every reader below gets (fieldKeyPad: the keys, the pad, its stick and the
+    // touch pad through the player's bindings) and the edges the events above made, recorded in the session's log -- or,
+    // replaying a log (CT_PLAYINPUT), taken from it instead of SDL. A report is taken FIRST, before any of this frame runs:
+    // its state is the end of the frame before, its picture the one on the screen, and its log ends there. A replay is
+    // graded at the same place (CT_REPLAY_CHECK). None of it writes the game: unused, the run is the vanilla game.
+    // CT_BUGREPORT_AT=<frame>[:<category>[:<note>]] (test) takes a report at that frame without the panel;
+    // CT_BUGREPORT_EXIT=<n> leaves after the n-th report is written.
+    { static int bugInit = 0, bugTouchFrames = 0, bugExit = 0; static long bugAt = -1, bugCheckAt = -1;
+      static char bugAtCat[32] = "other", bugAtNote[256] = "";
+      if (!bugInit) {
+        bugInit = 1;
+        const char* e1 = getenv("CT_BUGREPORT_AT");
+        if (e1 && *e1) { bugAt = atol(e1); const char* c = strchr(e1, ':');
+                         if (c) { snprintf(bugAtCat, sizeof bugAtCat, "%s", c + 1); char* c2 = strchr(bugAtCat, ':'); if (c2) *c2 = 0;
+                                  const char* n2 = strchr(c + 1, ':'); if (n2) snprintf(bugAtNote, sizeof bugAtNote, "%s", n2 + 1); } }
+        { const char* ex = getenv("CT_BUGREPORT_EXIT"); bugExit = ex && *ex ? atoi(ex) : 0; }
+        const char* rc = getenv("CT_REPLAY_CHECK");
+        if (rc && *rc) { char err[400];
+          if (!CtBugCheckOpen(rc, &bugCheckAt, err, sizeof err)) { printf("bugreport-replay: FAIL %s\n", err); fflush(stdout); return 2; } }
+      }
+      if (bugCheckAt >= 0 && g_bugFrame == bugCheckAt) {
+        static uint8_t nat[CAMW * CAMH * 3];
+        hostNativePicture(nat);
+        CtBugCheck(CtWramSys(fieldWram()), nat);
+        break;
+      }
+      int want = 0, panel = 0;
+      if (bugReq) { want = 1; panel = CtOverlayAvailable(); }
+      if (g_bugTouchDown) { if (++bugTouchFrames == 60) want = 1; } else bugTouchFrames = 0;   // held a second
+      if (bugAt >= 0 && g_bugFrame == bugAt) want = 2;
+      if (want) {
+        const char* md = battlePhase ? "battle" : menuPhase ? "menu" : inWorld ? "overworld" : f.vm ? "field" : "other";
+        int r = hostBugReport(pr, audioDev, f.vm, md, frameNo, f.vm && !inWorld && !battlePhase, px, py, pz, pfac, panel,
+                              want == 2 ? bugAtNote : "", want == 2 ? bugAtCat : "other", argv[0]);
+        if (r < 0) running = 0;
+        if (r > 0 && bugExit && --bugExit == 0) break;
+      }
+      uint16_t ed = 0;
+      if (g_bugPlay) {
+        uint16_t lv = 0;
+        CtBugPlayFrame(g_bugFrame, &lv, &ed);
+        g_hostLevel = lv;
+        talkPressed = !!(ed & CT_BUG_EDGE_A); upPressed = !!(ed & CT_BUG_EDGE_UP); downPressed = !!(ed & CT_BUG_EDGE_DOWN);
+        leftPressed = !!(ed & CT_BUG_EDGE_LEFT); rightPressed = !!(ed & CT_BUG_EDGE_RIGHT); nmType = !!(ed & CT_BUG_EDGE_NMTYPE);
+        nmDel = !!(ed & CT_BUG_EDGE_NMDEL); nmOk = !!(ed & CT_BUG_EDGE_NMOK); battleEndReq = !!(ed & CT_BUG_EDGE_F8);
+      } else {
+        uint16_t live = fieldKeyPadLive();
+        g_bugHeldMask &= live;                         // (a button let go since the panel closed is the game's again)
+        g_hostLevel = (uint16_t)(live & ~g_bugHeldMask);
+        ed = (uint16_t)((talkPressed ? CT_BUG_EDGE_A : 0) | (upPressed ? CT_BUG_EDGE_UP : 0) | (downPressed ? CT_BUG_EDGE_DOWN : 0) |
+                        (leftPressed ? CT_BUG_EDGE_LEFT : 0) | (rightPressed ? CT_BUG_EDGE_RIGHT : 0) |
+                        (nmType ? CT_BUG_EDGE_NMTYPE : 0) | (nmDel ? CT_BUG_EDGE_NMDEL : 0) | (nmOk ? CT_BUG_EDGE_NMOK : 0) |
+                        (battleEndReq ? CT_BUG_EDGE_F8 : 0));
+      }
+      g_hostLevelLatched = 1;
+      if (battleEndReq && battlePhase) CtBugEvent(0, "debug F8: the battle's instant end (the cartridge has no such key)");
+      CtBugInputFrame(g_hostLevel, ed);
+      g_bugFrame++;
+    }
 
     // (the title's own picture belongs to the frame that drew it: the probe above has had it; a frame that does not draw
     //  the title breaks the chain of latches the frames between interpolate along)
@@ -13387,7 +13664,8 @@ int main(int argc, char** argv) {
         char np[64]; snprintf(np, sizeof np, "ct_debug_%03d.state", n);
         int ok = CtSceneSaveState(f.vm, np, plr);
         CtSceneSaveState(f.vm, "ct_debug.state", plr);                  // the latest, for F9
-        if (ok) { fieldDebugLogCapture(n, "scene", frameNo, CtSceneMem7E(f.vm), px, py); hostDebugPictures(n); }
+        if (ok) { fieldDebugLogCapture(n, "scene", frameNo, CtSceneMem7E(f.vm), px, py); hostDebugPictures(n);
+                  CtBugEvent(1, "debug F5: snapshot %s", np); }
         if (ok && g_fieldAudio) {                                       // ...and the SPC of the same moment (F9's music)
           char na[72]; snprintf(na, sizeof na, "%s.apu", np);
           CtAudioSaveState(g_fieldAudio, na); CtAudioSaveState(g_fieldAudio, "ct_debug.state.apu"); }
@@ -13417,6 +13695,7 @@ int main(int argc, char** argv) {
       if (f9Now) {
         double plr[4]; int r = CtSceneLoadState(f.vm, "ct_debug.state", plr);
         if (r) fieldMapFromWram(&f, CtSceneMem7E(f.vm), "F9");
+        if (r) CtBugEvent(0, "debug F9: ct_debug.state restored (the game jumped to a snapshot)");
         // THE SOUND PROCESSOR GOES BACK WITH THE WRAM. The restored WRAM holds the CPU's side of the APU protocol (the
         // token it echoes, the song it believes is loaded); against the SPC that kept running, every handshake after the
         // restore is out of step and the music came out garbled (the user, 2026-10-15, ct_debug_051). A snapshot from

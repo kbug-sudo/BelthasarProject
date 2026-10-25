@@ -96,6 +96,7 @@ ambient-object block layout).
 | `settings.c` | `ct_settings.ini`: the player's options. Headless runs never read it. |
 | `overlay.cpp` | The F1 options overlay (Dear ImGui) over the paused game. |
 | `overlay_stub.c` | The no-overlay build, used when `third_party/imgui` is absent. |
+| `bugreport.c`, `bugreport_console.c` | The bug reporter's engine side: the session's input log (each frame's level and edges), the replay from a log (`CT_PLAYINPUT`, graded by `CT_REPLAY_CHECK`), the report it writes (work RAM, the two pictures as PNG, the log, the battery, the console's last lines); `~` and its panel are the host's (field.c, overlay.cpp). |
 | `present.c` | The presenter: the window and its backend behind one interface; the SDL_Renderer and OpenGL 3.3 backends. |
 | `present_vk.c` | The Vulkan backend (headers only; the driver's loader is reached through SDL at run time). |
 | `motion.c` | Mods: what each pixel of the picture moves with (its owner), and the redraw at a higher internal scale or between two frames. |
@@ -210,6 +211,11 @@ since 2026-10-11). They are exact by construction and graded per instruction aga
     256 columns must equal the vanilla picture (`tools/widescreen_check.py`). Menus are pillarboxed.
   - *Free sync*. Waits that exist only because the hardware was busy (song uploads, load stalls, the menu reload's
     black frames) cost no frames.
+- **The bug reporter.** `~` (or a DualSense's touchpad button held a second) pauses the game over a panel (overlay.cpp)
+  and writes a report (bugreport.c): what the player saw, the 256x224 picture, the work RAM, F5's snapshot, and every
+  frame's input since the session started, so a session from power-on replays exactly (`CT_PLAYINPUT`) and can be laid
+  against the cartridge (`tools/bugreport.py replay`). It reads the game and writes nothing of it: unused, the run is
+  the vanilla game.
 
 ## Where the reverse-engineering notes live
 
