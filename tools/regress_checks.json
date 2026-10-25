@@ -47130,7 +47130,7 @@
         "Chrono_Trigger_USA_SNES.sfc"
       ],
       "expect": [
-        "snd-machine: quick: 410 runs (58 with sound), PCM identical in 410 / 410 (27246282 samples), stdout identical in 410 / 410"
+        "snd-machine: quick: 411 runs (58 with sound), PCM identical in 411 / 411 (27246282 samples), stdout identical in 411 / 411"
       ],
       "pin": [
         "^snd-machine: "
@@ -47138,7 +47138,7 @@
       "timeout_s": 1800,
       "exclusive": true,
       "note_pass": "every Belthasar run of the quick tier sounds sample for sample and prints line for line the same on the game's sound machine as on the vendored SPC700 it replaced",
-      "notes": "tools/snd_machine_cmp.py quick: each quick-tier check whose argv is build/Belthasar.exe, run twice (CT_AUDIO_SPC=ref / =machine) with CT_AUDIO_PCM, CT_NOPACE and CT_AUDIO_LOCKSTEP (the sound's own clock: a run paced by the wall clock plays as many frames as the host had time for, the reference's against itself neither); its own output files moved apart. The stdout compared but the engine's name, the sound RAM's hash (the machine keeps no code and no stack in it: the driver is C) and the wall-clock pacing line. A difference is the machine's defect: never re-pin it. RE-PINNED 2026-10-19 (the results' cadence, the rule's cartridge): every results line's dwell takes a held A from its post + 19 (CD/01B3: the post on frame 0, CD/027F's two waits -- `$CCEC = 10` on frame 2 --, CD/020A's 16, the dwell from 19; under the rule the VWF build costs no frame). MEASURED on the playthrough's leg 20 (the forest ambushes: posts 3074 / 8424, boxes +2, an A held at 8443 closing line 0, the next post 16 later) and on the GATO fight of this check family (post 2549, box 2551, close 2569). The port tested from post + 21 (the first line) / + 20 (the rest: CT_BATTLE_RESULT_BUILD 3 -> 2). The fight ends 3-5 frames earlier with it; battle_module_tail_cmp (Black Hole on GATO) went from +3 to +0 on every quantity. And no C1/8120 head after the victory or the defeat (`$0027` stops on the victory's frame on the cartridge). RE-PINNED 2026-10-21 (ce84bdb..014bb4e, run on Windows; the sample total only): +17088 = 32 x 534 -- the two cold --scene 433 runs +27 frames each (the attract vehicle's power-on), five runs that end on an event -3 each and title-sequence-sound-reaches-driver -7 (the loads' cost); PCM and stdout identical in 412 / 412 as before. RE-PINNED 2026-10-22 (404971a; the total only): since b838ae4 +289 frames, run by run -- the two cold --scene 433 runs +91 each (the power-on, f-91..f-1), boot-load-save-sound-sequence +65 and title-sequence-sound-reaches-driver +57 (their argv +65), five runs that end on a load -3 each; PCM and stdout identical in 412 / 412. ==== RE-PINNED 2026-10-22 (the party3 fixtures became recipe twins, tools/fixtures/party3.json): the total moved by -7476 samples = 14 frames x 534, field-battle-bat9-return's fight on the twin ending 14 frames earlier (f2254 -> f2240); every run's PCM and stdout still identical. After the rebase onto ec5d0a9 (4bdb397, the sound timing) the total is 26952048 (-534, one frame of that commit's own); PCM and stdout still identical in 412 / 412. RE-PINNED 2026-10-22 (the five recipe families merged with 4bdb397, graded in a clean-room clone -- setup from the ROM, the public saves fetched, every fixture made by its recipe): the sample total only: the quick tier now has 410 Belthasar runs (the families moved checks onto other tools), every one PCM- and stdout-identical between the machine and the vendored SPC700."
+      "notes": "tools/snd_machine_cmp.py quick: each quick-tier check whose argv is build/Belthasar.exe, run twice (CT_AUDIO_SPC=ref / =machine) with CT_AUDIO_PCM, CT_NOPACE and CT_AUDIO_LOCKSTEP (the sound's own clock: a run paced by the wall clock plays as many frames as the host had time for, the reference's against itself neither); its own output files moved apart. The stdout compared but the engine's name, the sound RAM's hash (the machine keeps no code and no stack in it: the driver is C) and the wall-clock pacing line. A difference is the machine's defect: never re-pin it. RE-PINNED 2026-10-19 (the results' cadence, the rule's cartridge): every results line's dwell takes a held A from its post + 19 (CD/01B3: the post on frame 0, CD/027F's two waits -- `$CCEC = 10` on frame 2 --, CD/020A's 16, the dwell from 19; under the rule the VWF build costs no frame). MEASURED on the playthrough's leg 20 (the forest ambushes: posts 3074 / 8424, boxes +2, an A held at 8443 closing line 0, the next post 16 later) and on the GATO fight of this check family (post 2549, box 2551, close 2569). The port tested from post + 21 (the first line) / + 20 (the rest: CT_BATTLE_RESULT_BUILD 3 -> 2). The fight ends 3-5 frames earlier with it; battle_module_tail_cmp (Black Hole on GATO) went from +3 to +0 on every quantity. And no C1/8120 head after the victory or the defeat (`$0027` stops on the victory's frame on the cartridge). RE-PINNED 2026-10-21 (ce84bdb..014bb4e, run on Windows; the sample total only): +17088 = 32 x 534 -- the two cold --scene 433 runs +27 frames each (the attract vehicle's power-on), five runs that end on an event -3 each and title-sequence-sound-reaches-driver -7 (the loads' cost); PCM and stdout identical in 412 / 412 as before. RE-PINNED 2026-10-22 (404971a; the total only): since b838ae4 +289 frames, run by run -- the two cold --scene 433 runs +91 each (the power-on, f-91..f-1), boot-load-save-sound-sequence +65 and title-sequence-sound-reaches-driver +57 (their argv +65), five runs that end on a load -3 each; PCM and stdout identical in 412 / 412. ==== RE-PINNED 2026-10-22 (the party3 fixtures became recipe twins, tools/fixtures/party3.json): the total moved by -7476 samples = 14 frames x 534, field-battle-bat9-return's fight on the twin ending 14 frames earlier (f2254 -> f2240); every run's PCM and stdout still identical. After the rebase onto ec5d0a9 (4bdb397, the sound timing) the total is 26952048 (-534, one frame of that commit's own); PCM and stdout still identical in 412 / 412. RE-PINNED 2026-10-22 (the five recipe families merged with 4bdb397, graded in a clean-room clone -- setup from the ROM, the public saves fetched, every fixture made by its recipe): the sample total only: the quick tier now has 410 Belthasar runs (the families moved checks onto other tools), every one PCM- and stdout-identical between the machine and the vendored SPC700. | RE-PINNED 2026-10-25 (CC_Remaster_Project M7): 410 -> 411 runs -- the quick tier gained a Belthasar check, field-layer-cells-redraw-every-location (no sound: its PCM and stdout identical on both machines); the samples unchanged."
     },
     {
       "name": "lz-assets-data-identical",
@@ -47577,6 +47577,152 @@
           "find": "        g_hostLevel = (uint16_t)(live & ~g_bugHeldMask);",
           "replace": "        g_hostLevel = (uint16_t)(live & ~g_bugHeldMask & ~0x100); /* MUT */",
           "why": "the live level loses A: the log is not the drive and the game is another"
+        }
+      ]
+    },
+    {
+      "name": "field-layer-cells-redraw-every-location",
+      "tier": "quick",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--layercells"
+      ],
+      "inputs": [
+        "ct_assets.dat"
+      ],
+      "expect": [
+        "layercells: 512 locations, 6144 pictures, 33226752 cells (13819807 with a chip), 0 pixels differ, cells fnv 5348C5A5"
+      ],
+      "pin": [
+        "^layercells: "
+      ],
+      "timeout_s": 60,
+      "note_pass": "the map's six layer pictures of every location (scene.c CtFieldSceneLayers, the native drawer's), and each layer's map-ring tilemap too, are exactly the chips their cells name (CtFieldSceneLayerCells: chip, colour base, flips) drawn with the location's colours: 0 pixels differ; the cells' hash pins the description the HD presenter redraws",
+      "notes": "2026-10-25 (CC_Remaster_Project M7, the HD presenter). The HD presenter (src/hdpresent.c, a mod) redraws the map from HD art keyed by the original 8x8 chips, so it needs the map as cells, not pixels: draw_layer records, for a picture drawn at offset 0, the chip each 8x8 cell shows (after the held-chip substitution) with its colour base and flips. Belthasar --layercells opens every location twice (as loaded, and with every layer on its map ring, CtFieldSceneSetLayerOffsets mapBuilt 6), redraws each picture from its cells and compares it with the engine's, pixel by pixel (colour and coverage). The fnv is of every cell (chip, base, flags): re-pin only after an intentional change to the map's pictures, with 0 pixels still differing. The old code has no cells (no layercells line).",
+      "mutations": [
+        {
+          "file": "src/scene.c",
+          "find": "          ce->chip = c->chip; ce->base = c->base; ce->flags = (uint8_t)(c->fx | (c->fy << 1));",
+          "replace": "          ce->chip = c->chip; ce->base = c->base; ce->flags = (uint8_t)c->fx; /* MUT */",
+          "why": "the cells lose the vertical flip: every y-flipped chip is redrawn upright"
+        },
+        {
+          "file": "src/scene.c",
+          "find": "          ce->chip = c->chip; ce->base = c->base; ce->flags = (uint8_t)(c->fx | (c->fy << 1));",
+          "replace": "          ce->chip = c->chip; ce->base = c->base & 0x70; ce->flags = (uint8_t)(c->fx | (c->fy << 1)); /* MUT */",
+          "why": "the cells' colour base loses a palette row bit: those chips are redrawn in another row's colours"
+        },
+        {
+          "file": "src/scene.c",
+          "find": "        if (cells && !fx0 && !fy0 && cy * 16 + koy < H && cx * 16 + kox < W) {",
+          "replace": "        if (cells && !fx0 && !fy0 && cy * 16 + koy < H && cx * 16 + kox < W && k != 3) { /* MUT */",
+          "why": "every metatile's bottom-right chip is left out of the cells"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-field-equals-the-frame-at-4x",
+      "tier": "full",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "433",
+        "--frames",
+        "5000",
+        "--selftest"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOPACE": "1",
+        "CT_HDCHECK": "1"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "hdcheck: 1000 frames, 0 differ, 0 px",
+        "hdcheck-native: 4000 frames, 0 differ, 0 px"
+      ],
+      "pin": [
+        "^hdcheck: \\d+ frames",
+        "^hdcheck-native: \\d+ frames"
+      ],
+      "timeout_s": 600,
+      "note_pass": "the HD presenter (a mod) draws the field from its HD pictures exactly as the game composes it: with the check's art (every chip its own pixels, each 4x4) every field frame of the attract it draws is the composed frame at 4x (where no layer stands between two pixels) and the native drawer's at 4x, at t = 256 and halfway between two frames: 0 px",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). src/hdpresent.c keeps the map's HD pictures as palette-index maps built from the cells (scene.h CtFieldSceneLayerCells; field-layer-cells-redraw-every-location) and redrawn cell by cell when a cell or its chip changes (chip animation), coloured with the live palette, and composes them with fieldnative.c's rules (layer order, sub screen and colour math, the foreground over the sprites, the iris, the colour window, the caption plane). CT_HDCHECK=1 turns the presenter on with CtHdNearest (no pack; each chip 4x4 of itself), so its picture must be the frame at 4x: (1) at t = 256 against the composed frame, each pixel a 4x4 block, on the frames where no self-scrolling layer stands off its whole pixel at 4x (CtMotFit's continuous offsets: at 4x the frames-between rule draws such a layer at its quarter pixel, as fieldnative.c does); (2) against the native drawer at 4x (CT_NATIVECHECK's, itself pinned at 1x) at t = 256 and t = 128 wherever it draws. Over the attract's first 5000 frames. The old code has no HD presenter (no hdcheck line).",
+      "mutations": [
+        {
+          "file": "src/hdpresent.c",
+          "find": "    for (int x = 0; x < HDN; x++) { uint8_t v = s[fx ? HDN - 1 - x : x]; r[x] = v ? (uint8_t)(ce->base + v) : 0; }",
+          "replace": "    for (int x = 0; x < HDN; x++) { uint8_t v = s[x]; r[x] = v ? (uint8_t)(ce->base + v) : 0; } /* MUT */",
+          "why": "an x-flipped chip is drawn unflipped in the HD pictures"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "    for (int i = 0; i < 6; i++) tab[i * W + X] = act[i] ? wrapi(offXk[i] + X, g_pics.w[i]) : 0;   // (HD columns)",
+          "replace": "    for (int i = 0; i < 6; i++) tab[i * W + X] = act[i] ? wrapi(offXk[i] + X + 4, g_pics.w[i]) : 0; /* MUT */",
+          "why": "every layer sampled a pixel to the right of the camera"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "        if (spfRow[X] == 2 || !fg) { memcpy(c, spRow + X * 3, 3); sprPal = sppRow[X]; }",
+          "replace": "        if (spfRow[X]) { memcpy(c, spRow + X * 3, 3); sprPal = sppRow[X]; } /* MUT */",
+          "why": "the sprites are drawn over the map's priority-1 foreground"
+        }
+      ]
+    },
+    {
+      "name": "hd-presenter-field-animated-tiles-at-4x",
+      "tier": "full",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "5",
+        "--frames",
+        "1500",
+        "--selftest"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOPACE": "1",
+        "CT_HDCHECK": "1"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "hdcheck: 1500 frames, 0 differ, 0 px",
+        "hdcheck-native: 2500 frames, 0 differ, 0 px"
+      ],
+      "pin": [
+        "^hdcheck: \\d+ frames",
+        "^hdcheck-native: \\d+ frames"
+      ],
+      "timeout_s": 600,
+      "note_pass": "the HD presenter over Leene Square (loc 005), whose map animates its tiles (FD/DE98's records copy new chips into the map's own every few frames): with the check's art its picture stays the frame at 4x through 1500 frames -- each chip the animation changes is redrawn in the HD pictures",
+      "notes": "2026-10-25 (CC_Remaster_Project M7). hd-presenter-field-equals-the-frame-at-4x's twin over a map with chip animation (the attract's field frames have none, so a presenter that never redrew an animated chip passed it): Belthasar --scene 5 runs Leene Square from its load, no input, 1500 frames; CT_HDCHECK as there. hdpresent.c redraws, on each new set of pictures (CtSceneLayerCells.gen), every cell whose cell changed and every cell showing a chip whose 64 indices changed. The old code has no HD presenter (no hdcheck line).",
+      "mutations": [
+        {
+          "file": "src/hdpresent.c",
+          "find": "        if (memcmp(ce, &g_pics.cells[p][j], sizeof *ce) || (ce->chip < nch && changed[ce->chip]))",
+          "replace": "        if (memcmp(ce, &g_pics.cells[p][j], sizeof *ce)) /* MUT */",
+          "why": "a chip the animation changed keeps its old HD picture"
+        },
+        {
+          "file": "src/hdpresent.c",
+          "find": "  if (!full && g_pics.gen == C->gen) return 1;",
+          "replace": "  if (!full) return 1; /* MUT */",
+          "why": "the HD pictures are drawn once a location and never follow the map's animation"
         }
       ]
     }

@@ -576,6 +576,8 @@
         "follower-conga-2member",
         "follower-conga-3member",
         "harness-play-goal-and-failure",
+        "hd-presenter-field-animated-tiles-at-4x",
+        "hd-presenter-field-equals-the-frame-at-4x",
         "jackie-saves-census-vs-oracle",
         "joypad",
         "lavos-day-ff07-plays-through-to-the-title-in-the-port",
@@ -1354,6 +1356,7 @@
         "field-item-op-live-vm",
         "field-ladder-arrival-tile-mode",
         "field-ladder-climb-anim",
+        "field-layer-cells-redraw-every-location",
         "field-layer-scroll-drift-vs-oracle",
         "field-layer-scroll-parallax-vs-oracle",
         "field-lead-script-placement-01B-vs-oracle",
@@ -1494,6 +1497,8 @@
         "follower-conga-2member",
         "follower-conga-3member",
         "harness-play-goal-and-failure",
+        "hd-presenter-field-animated-tiles-at-4x",
+        "hd-presenter-field-equals-the-frame-at-4x",
         "jackie-saves-census-vs-oracle",
         "lavos-day-chain-in-the-port",
         "lavos-day-ff07-plays-through-to-the-title-in-the-port",
@@ -5314,8 +5319,8 @@
         "boot-title-opening-no-false-start-vs-rule-cartridge",
         "ow-ferry-both-ways-vs-rule-cartridge"
       ],
-      "sha256": "dd5a23da706c5aed2710f2deaa69d675ea0fc3496dba78fa57997ca0c859e688",
-      "size": 1699645,
+      "sha256": "c86f9f9ffa80b56d98e30a7462047c8cffdd86cbdcb81abf3d929a2b4bb95888",
+      "size": 1706448,
       "present_when_recorded": true
     },
     {

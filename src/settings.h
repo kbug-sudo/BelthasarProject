@@ -27,6 +27,7 @@ enum { CT_SCALE_FIT = 0, CT_SCALE_INTEGER = 1, CT_SCALE_STRETCH = 2 };
 enum { CT_ASPECT_PIXEL = 0, CT_ASPECT_4_3 = 1 };          // 256x224 square pixels (8:7) / a 4:3 television
 enum { CT_SYNC_FRAME_PERFECT = 0, CT_SYNC_FREE = 1 };
 enum { CT_WIDE_OFF = 0, CT_WIDE_16_9 = 1, CT_WIDE_16_10 = 2, CT_WIDE_21_9 = 3 };
+enum { CT_PRESENTER_VANILLA = 0, CT_PRESENTER_HD = 1 };   // hdpresent.h: the field from HD art (a mod)
 
 typedef struct CtSettings {
   // video
@@ -38,6 +39,7 @@ typedef struct CtSettings {
   int renderScale;              // the internal picture, x 256x224 (1..4): the field's sub-pixel positions (motion.h)
   int interpolate;              // the frames between: the field drawn at the screen's rate between two 60 Hz frames
   int widescreen;               // CT_WIDE_*: the field's picture wider than the SNES's 256 (the rest pillarboxed)
+  int presenter;                // CT_PRESENTER_*: the picture as the SNES drew it, or the field redrawn from HD art at 4x
   int wideRoomWrap;             // widescreen: a room as wide as its map shows the map wrapping in the sides (else black)
   int vsync;
   int backend;                  // present.h CT_BACKEND_*: SDL_Renderer / OpenGL / Vulkan (next start)

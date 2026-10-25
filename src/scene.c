@@ -233,7 +233,8 @@ static int build_pal_anim_desc(const uint8_t* rom, int index, uint8_t* out) {
 static void draw_layer(uint8_t* px, uint8_t* cov, int W, int H, const uint16_t* tiles, int lw, int lh,
                        const Meta* metas, int nmeta, const uint8_t* chips, const uint8_t* present,
                        int nchips, uint8_t pal[128][3], int prio, uint8_t bit, uint8_t* priomask,
-                       const uint8_t* tprio, int tpw, int tph, int sox, int soy, int mapRing, const uint16_t* held) {
+                       const uint8_t* tprio, int tpw, int tph, int sox, int soy, int mapRing, const uint16_t* held,
+                       CtSceneCell* cells) {
   if (!tiles || !metas || !chips) return;
   // SNES BG layers wrap: a layer smaller than the canvas tiles to fill it
   // (chip_x % width, chip_y % height in CTViewer). Iterate the whole canvas in
@@ -279,6 +280,11 @@ static void draw_layer(uint8_t* px, uint8_t* cov, int W, int H, const uint16_t* 
         if ((int)c->prio != (prio == 1)) continue;
         const uint8_t* tile = chips + (size_t)c->chip * 64;
         int kox = (k % 2) * 8, koy = (k / 2) * 8;
+        // `cells` (a picture drawn at offset 0, CtFieldSceneLayers): the chip this 8x8 cell shows (CtFieldSceneLayerCells)
+        if (cells && !fx0 && !fy0 && cy * 16 + koy < H && cx * 16 + kox < W) {
+          CtSceneCell* ce = &cells[(size_t)((cy * 16 + koy) / 8) * (W / 8) + (cx * 16 + kox) / 8];
+          ce->chip = c->chip; ce->base = c->base; ce->flags = (uint8_t)(c->fx | (c->fy << 1));
+        }
         for (int y = 0; y < 8; y++) {
           int py = cy * 16 - fy0 + koy + y; if (py >= H) break;
           if (py < 0) continue;
@@ -313,7 +319,7 @@ static void draw_pass(uint8_t* px, uint8_t* cov, int W, int H, int targets, uint
     LInfo* L = order_l[i];
     draw_layer(px, cov, W, H, L->tiles, L->lw, L->lh, L->metas, L->nmeta,
                L->chips, L->present, L->nchips, pal, order_prio[i], (uint8_t)order_bit[i], priomask,
-               L->tprio, L->tpw, L->tph, L->sox, L->soy, L->mapRing, L->held);
+               L->tprio, L->tpw, L->tph, L->sox, L->soy, L->mapRing, L->held, NULL);
   }
 }
 
@@ -355,6 +361,7 @@ typedef struct {
   uint8_t* bakeCov; int bakeCovW, bakeCovH; // the last CtFieldSceneBake's MAIN-screen coverage: per pixel the layer bit
                                            //   (L1 1, L2 2, L3 4) of the pixel on top, 0 = backdrop
   uint8_t* layRgb[6]; uint8_t* layCov[6]; int layW[6], layH[6], layDirty;   // CtFieldSceneLayers, built on demand
+  CtSceneCell* layCell[6]; unsigned layGen;              // ...and the chip each cell of them shows (CtFieldSceneLayerCells)
   int bakedO[4];                           // the layer offsets the last bake drew at (l2ox l2oy l3ox l3oy then)
   uint8_t* bakeMotCov;                     // ...and the layer the pixel's picture comes from: the main screen's, else the
                                            //   sub screen's where only it shows (motion.h: what the pixel moves with)
@@ -369,7 +376,8 @@ static void CtFreeSceneData(SceneData* sd) {
   free(sd->l1t); free(sd->l2t); free(sd->l3t); free(sd->tprio);
   for (int i = 0; i < 3; i++) { free(sd->held[i]); sd->held[i] = NULL; sd->heldN[i] = 0; }
   free(sd->animChips); free(sd->chipAnimDesc); free(sd->palAnimDesc); free(sd->prevChips); free(sd->bakeCov); free(sd->bakeMotCov); free(sd->bakeMain); free(sd->bakeSub); free(sd->bakeSubCov);
-  for (int i = 0; i < 6; i++) { free(sd->layRgb[i]); free(sd->layCov[i]); sd->layRgb[i] = sd->layCov[i] = NULL; }
+  for (int i = 0; i < 6; i++) { free(sd->layRgb[i]); free(sd->layCov[i]); free(sd->layCell[i]);
+                                sd->layRgb[i] = sd->layCov[i] = NULL; sd->layCell[i] = NULL; }
 }
 
 // Build a scene's render data from the ROM (decode tilesets/map/palette, bake the
@@ -874,22 +882,44 @@ int CtFieldSceneLayers(void* h, CtSceneLayers* o) {
       if (L->mapRing) { LW = (L->lw != 16 || L->lh != 16) ? 512 : 256; LH = 256; }
       if (LW <= 0 || LH <= 0) { LW = LH = 16; }
       if (sd->layW[i] != LW || sd->layH[i] != LH || !sd->layRgb[i]) {
-        free(sd->layRgb[i]); free(sd->layCov[i]);
+        free(sd->layRgb[i]); free(sd->layCov[i]); free(sd->layCell[i]);
         sd->layRgb[i] = malloc((size_t)LW * LH * 3); sd->layCov[i] = malloc((size_t)LW * LH);
+        sd->layCell[i] = malloc((size_t)(LW / 8) * (LH / 8) * sizeof(CtSceneCell));
         sd->layW[i] = LW; sd->layH[i] = LH;
       }
-      if (!sd->layRgb[i] || !sd->layCov[i]) return 0;
+      if (!sd->layRgb[i] || !sd->layCov[i] || !sd->layCell[i]) return 0;
       memset(sd->layRgb[i], 0, (size_t)LW * LH * 3); memset(sd->layCov[i], 0, (size_t)LW * LH);
+      memset(sd->layCell[i], 0xFF, (size_t)(LW / 8) * (LH / 8) * sizeof(CtSceneCell));   // (chip 0xFFFF: none)
       if (ordLay[i] == 2 && !sd->has_l3) continue;
       draw_layer(sd->layRgb[i], sd->layCov[i], LW, LH, L->tiles, L->lw, L->lh, L->metas, L->nmeta, L->chips, L->present,
-                 L->nchips, palc, ordPri[i], ordBit[i], NULL, L->tprio, L->tpw, L->tph, 0, 0, L->mapRing, L->held);
+                 L->nchips, palc, ordPri[i], ordBit[i], NULL, L->tprio, L->tpw, L->tph, 0, 0, L->mapRing, L->held,
+                 sd->layCell[i]);
     }
-    sd->layDirty = 0;
+    static unsigned layGens;                       // (one sequence for every scene: a new location never repeats a gen)
+    sd->layDirty = 0; sd->layGen = ++layGens;
   }
   for (int i = 0; i < 6; i++) { o->rgb[i] = sd->layRgb[i]; o->cov[i] = sd->layCov[i]; o->w[i] = sd->layW[i]; o->h[i] = sd->layH[i]; }
   o->mainT = main_t; o->subT = sub_t; o->blendEn = blend_en; o->subOp = sub_op; o->half = half;
   memcpy(o->backdrop, sd->pal[0], 3);
   return 1;
+}
+int CtFieldSceneLayerCells(void* h, CtSceneLayerCells* o) {
+  SceneData* sd = (SceneData*)h;
+  CtSceneLayers L;
+  if (!sd || !o || !CtFieldSceneLayers(h, &L)) return 0;
+  static const int ordLay[6] = { 2, 1, 0, 1, 0, 2 };
+  for (int i = 0; i < 6; i++) {
+    o->cell[i] = sd->layCell[i]; o->cw[i] = sd->layW[i] / 8; o->ch[i] = sd->layH[i] / 8;
+    o->chips[i] = ordLay[i] == 2 ? sd->chips3 : sd->chips12; o->nchips[i] = ordLay[i] == 2 ? sd->nchips3 : 768;
+  }
+  o->pal = (const uint8_t (*)[3])sd->pal;
+  o->gen = sd->layGen;
+  return 1;
+}
+const uint8_t* CtFieldSceneAnimChips(void* h, int* n) {
+  SceneData* sd = (SceneData*)h;
+  if (n) *n = sd ? sd->nAnimChips : 0;
+  return sd && sd->nAnimChips > 0 ? sd->animChips : NULL;
 }
 // The layer each pixel of the last bake moves with (SceneData.bakeMotCov), the coverage's size; NULL before the first.
 const uint8_t* CtFieldSceneMotionCoverage(void* h) {

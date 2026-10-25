@@ -43,6 +43,20 @@ typedef struct CtSceneLayers {
   int beyond;                              // (host, the widescreen) the layers drawn past the room's edge: field.c fieldBeyondLayers
 } CtSceneLayers;
 int CtFieldSceneLayers(void* h, CtSceneLayers* out);   // 1 = filled (built on demand, again after each bake)
+// THE SAME PICTURES AS CELLS (a presenter's description of the map: what an HD presenter redraws with its own art): for
+// each of the six, the 8x8 chip every cell of its period shows -- the picture is exactly these chips, drawn with `pal`
+// (colour base + v for each non-zero index v), flipped as the cell says. `gen` changes whenever the pictures are rebuilt
+// (a bake, a chip or palette animation step), so a presenter knows when to redraw its own.
+typedef struct CtSceneCell { uint16_t chip; uint8_t base, flags; } CtSceneCell;   // chip 0xFFFF = none; flags 1 = x flip, 2 = y flip
+typedef struct CtSceneLayerCells {
+  const CtSceneCell* cell[6]; int cw[6], ch[6];   // (w/8) x (h/8) cells per picture (CtSceneLayers' w and h)
+  const uint8_t* chips[6]; int nchips[6];         // the chips the picture draws from: 64 indices each, row by row
+  const uint8_t (*pal)[3];                        // the 128 colours the pictures were drawn with
+  unsigned gen;
+} CtSceneLayerCells;
+int CtFieldSceneLayerCells(void* h, CtSceneLayerCells* out);   // 1 = filled (builds the pictures if they are not)
+// The location's chip animation set: every chip its animation copies into the map's chips (64 indices each); NULL = none.
+const uint8_t* CtFieldSceneAnimChips(void* h, int* n);
 int CtFieldSceneLayerOffsetsBaked(void* h, int* o2x, int* o2y, int* o3x, int* o3y);   // the offsets the bake drew at   // per pixel the layer bit its picture comes from (motion.h); the coverage's size
 // The map header's layer-scroll bytes md[1..3] (0 when the pack predates them) and the BG2/BG3
 // sample offsets relative to BG1 in pixels (returns 1 when they changed, i.e. re-bake).

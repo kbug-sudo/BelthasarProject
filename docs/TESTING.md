@@ -2545,6 +2545,27 @@ work RAM and picture hashes are the drive-played session's (bugreport-report-rep
 across a `~` panel (3195-3209, the panel at 3200) the game gets Start before the panel and not after it until the button
 is let go; every report replays exactly. Needs `third_party/imgui`.
 
+### field-layer-cells-redraw-every-location (`Belthasar --layercells`)
+
+The map's pictures as a presenter is handed them (scene.h `CtFieldSceneLayerCells`): for every location -- as loaded, and
+with every layer on its map ring -- each of the six layer pictures fieldnative.c draws from (BG1/BG2/BG3 x priority) is
+redrawn from its 8x8 cells (each cell's chip, colour base and flips, recorded by draw_layer after the held-chip
+substitution) and compared with the engine's, colour and coverage, pixel by pixel: 0 differ over 6144 pictures. The cells'
+hash pins the description; re-pin only after an intentional change to the map's pictures, with 0 pixels still differing.
+
+### hd-presenter-field-equals-the-frame-at-4x (`Belthasar --scene 433 --frames 5000 --selftest`, `CT_HDCHECK=1`)
+
+The HD presenter (src/hdpresent.c, a mod) composes the field from its own HD pictures, built from the cells above with the
+live palette. With the check's art (`CtHdNearest`: every chip its own pixels, each 4x4, no pack) its picture must be the
+frame at 4x: against the composed frame, each pixel a 4x4 block, on the frames where no self-scrolling layer stands off
+its whole pixel at 4x (`hdcheck:`), and against the native drawer at 4x at t = 256 and halfway between two frames
+(`hdcheck-native:`). Over the attract's first 5000 frames: 0 px.
+
+### hd-presenter-field-animated-tiles-at-4x (`Belthasar --scene 5 --frames 1500 --selftest`, `CT_HDCHECK=1`)
+
+The same grade over Leene Square, whose map animates its tiles (the attract's field frames have none): each chip the
+animation changes is redrawn in the HD pictures, so the picture stays the frame at 4x for 1500 frames.
+
 ### battle-enemy-census-defeat-exit-tail-hdma-vs-oracle (`python tools/battle_ab.py enemies 6E,E3,F4 -j3`)
 
 Three enemies of the census in GATO's arena whose fights end in the party's defeat: every monitored change, `$AE93` (the

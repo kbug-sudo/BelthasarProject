@@ -45,6 +45,7 @@
 #include "settings.h"    // the player's options (ct_settings.ini), edited by the F1 overlay
 #include "overlay.h"     // the F1 options overlay (Dear ImGui; a stub without third_party/imgui)
 #include "bugreport.h"   // the bug reporter (`~`): the session's input log, its reports and their replay
+#include "hdpresent.h"   // the HD presenter (a mod): the field redrawn at 4x from HD art keyed by the original chips
 #include "touchpad.h"    // the on-screen virtual gamepad (a player option; on by default on Android only)
 #ifdef __ANDROID__
 #include "android.h"     // where the player's ROM, ct_assets.dat, save and options live on the device
@@ -219,6 +220,7 @@ static int hostSyncFree(void) { return g_hostInteractive && CtSettingsGet()->syn
 // its output played), so the new song starts with the scene. Off (the default, and always headless): the SNES's timing.
 static int hostSoundInstant(void) { return g_hostInteractive && (CtSettingsGet()->sync == CT_SYNC_FREE || CtSettingsGet()->instantUploads); }
 static int hostWideW(void);                      // (the widescreen's picture width, below)
+static int hostHd(void);                         // (the HD presenter is on, below)
 static void hostDstRect(CtPresenter* pr, SDL_Rect* r) {
   int ow = CAMW, oh = CAMH;
   CtPresentOutputSize(pr, &ow, &oh);
@@ -2670,6 +2672,7 @@ static void hostUploadPictureAt(CtPresenter* pr, const uint8_t* fb, int w, int t
   int k = g_hostInteractive ? CtSettingsGet()->renderScale : 1;
   if (k < 1) k = 1; if (k > 4) k = 4;
   if (interp && k == 1) k = 4;                     // (between two frames a whole pixel is too coarse a step)
+  if (hostHd()) k = CT_HD_K;                       // (the HD presenter's pictures are 4x)
   if (g_hostTi && (k > 1 || hostWideW() > CAMW || t < 256)) {
     int W = hostWideW();
     size_t n = (size_t)W * k * CAMH * k * 3;
@@ -2685,6 +2688,11 @@ static void hostUploadPictureAt(CtPresenter* pr, const uint8_t* fb, int w, int t
   size_t n = (size_t)w * k * CAMH * k * 3;
   if (g_hostPicN < n) { free(g_hostPic); g_hostPic = (uint8_t*)malloc(n); g_hostPicN = g_hostPic ? n : 0; }
   if (!g_hostPic) { hostUpload(pr, fb, w, CAMH); return; }
+  // the HD presenter: the field from HD art (hdpresent.c), at t or as the frame itself
+  if (hostHd() && CtFieldRasterHD(&g_motBuf[g_motIdx], &g_motBuf[g_motIdx ^ 1], fb, w, t, g_hostPic)) {
+    hostUpload(pr, g_hostPic, w * k, CAMH * k);
+    return;
+  }
   // the frames between: natively where the frame allows it (fieldnative.c), else the reprojection
   if (!(t < 256 && !getenv("CT_NATIVE_OFF") && (CtFieldRasterNative(&g_motBuf[g_motIdx], &g_motBuf[g_motIdx ^ 1], fb, w, t, k, g_hostPic) ||
                                                 owRasterNative(&g_motBuf[g_motIdx], &g_motBuf[g_motIdx ^ 1], fb, w, t, k, g_hostPic))))
@@ -2748,6 +2756,16 @@ static int hostRefreshHz(CtPresenter* pr) {
     age = 120;
   }
   return hz;
+}
+// THE HD PRESENTER (settings.h presenter, hdpresent.h; a mod): the field drawn at 4x from HD art. An interactive run's
+// option, or CT_HD_PRESENTER=1 (checks: a headless run keeps every mod off otherwise). Its art is loaded once (CT_HD_DIR).
+static int hostHd(void) {
+  static int env = -1, opened;
+  if (env < 0) { const char* e = getenv("CT_HD_PRESENTER"); env = (e && *e && *e != '0') || getenv("CT_HDCHECK");
+                 if (getenv("CT_HDCHECK")) CtHdNearest(1); }
+  int on = env || (g_hostInteractive && CtSettingsGet()->presenter == CT_PRESENTER_HD);
+  if (on && !opened) { opened = 1; CtHdOpen(NULL); }
+  return on;
 }
 static int hostInterp(CtPresenter* pr) {
   const CtSettings* st = CtSettingsGet();
@@ -2917,6 +2935,37 @@ static void hostPresentMot(CtPresenter* pr, const uint8_t* fb, int w, int motion
           printf("\n"); } }
       if (ncFrames % 500 == 0) printf("nativecheck: %ld frames, %ld differ, %ld px\n", ncFrames, ncBad, ncPx);
     } }
+  // CT_HDCHECK=1 (check): the HD presenter with the check's art (CtHdNearest: each chip its own pixels 4x4) == the frame
+  // at 4x. At t = 256 it is the composed frame, every pixel a 4x4 block -- where no layer scrolls on its own by less than
+  // a pixel (CtMotFit's continuous offsets: at 4x such a layer stands at its quarter pixel, as the frames between draw
+  // it); with the native drawer at 4x (fieldnative.c, CT_NATIVECHECK's) at t = 256 and halfway, wherever it draws
+  if (getenv("CT_HDCHECK") && hostHd() && cur->valid && cur->native && cur->hdCells) {
+    static uint8_t* hb; static uint8_t* nb4; static long hcFrames, hcBad, hcPx, hmFrames, hmBad, hmPx;
+    const size_t n4 = (size_t)FIELD_WMAX * 4 * CAMH * 4 * 3;
+    if (!hb) { hb = (uint8_t*)malloc(n4); nb4 = (uint8_t*)malloc(n4); }
+    const CtMotFrame* prev = &g_motBuf[g_motIdx ^ 1];
+    #define HDQ(q, o) ((long)floor((q) * 4 + 1e-9) != 4L * (o))      // (a continuous offset off its whole pixel at 4x)
+    const int frac = cur->qFrac && prev->valid && prev->qFrac && (HDQ(cur->q2x, cur->o2x) || HDQ(cur->q2y, cur->o2y) ||
+                     HDQ(cur->q3x, cur->o3x) || HDQ(cur->q3y, cur->o3y) || HDQ(cur->qbx, cur->bg3X) || HDQ(cur->qby, cur->bg3Y));
+    #undef HDQ
+    if (hb && nb4 && !frac && CtFieldRasterHD(cur, prev, fb, w, 256, hb)) {
+      long d = 0;
+      for (int Y = 0; Y < CAMH * 4; Y++)
+        for (int X = 0; X < w * 4; X++)
+          if (memcmp(hb + ((size_t)Y * w * 4 + X) * 3, fb + ((size_t)(Y / 4) * w + X / 4) * 3, 3)) d++;
+      hcFrames++; if (d) { hcBad++; hcPx += d; }
+      if (d && getenv("CT_HDCHECK")[0] == '2') printf("hddiff: f%d scene %X px %ld\n", frameNo, cur->scene, d);
+      if (hcFrames % 500 == 0) printf("hdcheck: %ld frames, %ld differ, %ld px\n", hcFrames, hcBad, hcPx);
+    }
+    for (int t = 128; hb && nb4 && t <= 256; t += 128)
+      if (CtFieldRasterNative(cur, prev, fb, w, t, 4, nb4) && CtFieldRasterHD(cur, prev, fb, w, t, hb)) {
+        long dm = 0;
+        for (size_t i = 0; i < (size_t)w * 4 * CAMH * 4; i++) if (memcmp(hb + i * 3, nb4 + i * 3, 3)) dm++;
+        hmFrames++; if (dm) { hmBad++; hmPx += dm; }
+        if (dm && getenv("CT_HDCHECK")[0] == '2') printf("hddiff-native: f%d t%d scene %X px %ld\n", frameNo, t, cur->scene, dm);
+        if (hmFrames % 500 == 0) printf("hdcheck-native: %ld frames, %ld differ, %ld px\n", hmFrames, hmBad, hmPx);
+      }
+  }
   motCheck(cur, &g_motBuf[g_motIdx ^ 1], fb, w, frameNo++);
   if (g_hostSkipPresent) { g_hostPresentSkips++; hostUploadPictureAt(pr, fb, w, 256, 0); g_motIdx ^= 1; return; }
   int interp = hostInterp(pr), presents = 0;
@@ -10388,6 +10437,57 @@ int main(int argc, char** argv) {
     if (!strcmp(argv[i], "--asccensus")) {                  // every PC anim script's opcodes (battle.c CtBattleAscCensus)
       if (!CtBattleLoadRom("Chrono_Trigger_USA_SNES.sfc")) { printf("asccensus: no ROM\n"); return 1; }
       CtBattleAscCensus(); return 0;
+    }
+    if (!strcmp(argv[i], "--layercells")) {                 // the map's pictures = their cells (scene.h CtFieldSceneLayerCells)
+      // Every location's six layer pictures (fieldnative.c's), drawn again from the cells a presenter is handed -- each
+      // cell's chip, flipped, in its colours base + v -- against the engine's own, pixel for pixel; with each layer's
+      // map-ring tilemap too (mapBuilt 6). Then a hash of every cell: the description an HD presenter redraws.
+      CtAssets la;
+      if (!datpath || !CtAssetsOpen(&la, datpath)) { printf("layercells: FAIL no assets (--assets before --layercells)\n"); return 1; }
+      long locs = 0, pics = 0, cells = 0, used = 0, bad = 0; uint32_t fnv = 2166136261u;
+      for (int loc = 0; loc < 512; loc++)
+        for (int ring = 0; ring < 2; ring++) {
+          void* sc = CtFieldSceneOpen(&la, loc, 0);
+          if (!sc) continue;
+          if (ring) CtFieldSceneSetLayerOffsets(sc, 0, 0, 0, 0, 6);
+          CtSceneLayers L; CtSceneLayerCells C;
+          if (CtFieldSceneLayers(sc, &L) && CtFieldSceneLayerCells(sc, &C)) {
+            locs += !ring;
+            for (int p = 0; p < 6; p++) {
+              int W = L.w[p], H = L.h[p];
+              if (C.cw[p] * 8 != W || C.ch[p] * 8 != H) { bad += (long)W * H; continue; }
+              pics++;
+              for (int cy = 0; cy < C.ch[p]; cy++)
+                for (int cx = 0; cx < C.cw[p]; cx++) {
+                  const CtSceneCell* ce = &C.cell[p][(size_t)cy * C.cw[p] + cx];
+                  cells++;
+                  for (int k = 0; k < (int)sizeof *ce; k++) { fnv ^= ((const uint8_t*)ce)[k]; fnv *= 16777619u; }
+                  int on = ce->chip != 0xFFFF && ce->chip < C.nchips[p];
+                  used += on;
+                  for (int y = 0; y < 8; y++)
+                    for (int x = 0; x < 8; x++) {
+                      size_t q = (size_t)(cy * 8 + y) * W + cx * 8 + x;
+                      int v = on ? C.chips[p][(size_t)ce->chip * 64 + ((ce->flags & 2) ? 7 - y : y) * 8 + ((ce->flags & 1) ? 7 - x : x)] : 0;
+                      uint8_t c[3] = { 0, 0, 0 };
+                      if (v) memcpy(c, C.pal[ce->base + v], 3);
+                      if ((v != 0) != (L.cov[p][q] != 0) || memcmp(c, L.rgb[p] + q * 3, 3)) bad++;
+                    }
+                }
+            }
+          }
+          CtFieldSceneClose(sc);
+        }
+      printf("layercells: %ld locations, %ld pictures, %ld cells (%ld with a chip), %ld pixels differ, cells fnv %08X\n",
+             locs, pics, cells, used, bad, fnv);
+      CtAssetsClose(&la);
+      return 0;
+    }
+    if (!strcmp(argv[i], "--hdautopass") && i + 1 < argc) {   // the HD presenter's automatic pass (hdpresent.h)
+      CtAssets ha;
+      if (!datpath || !CtAssetsOpen(&ha, datpath)) { printf("hdautopass: FAIL no assets (--assets before --hdautopass)\n"); return 1; }
+      int ok = CtHdAutoPass(&ha, argv[++i]);
+      CtAssetsClose(&ha);
+      return ok ? 0 : 1;
     }
     if (!strcmp(argv[i], "--walktest") && i + 1 < argc) { walkDir = argv[++i][0]; continue; }  // headless sub-pixel walk
     if ((!strcmp(argv[i], "--assets") || !strcmp(argv[i], "--datonly")) && i + 1 < argc) datpath = argv[++i];
@@ -20456,9 +20556,10 @@ int main(int argc, char** argv) {
     mot->valid = f.sd && f.base && !battleCompose && !arenaShift;
     // the frames between natively (fieldnative.c): the map's layers, when nothing the native drawer leaves out is up --
     // the caption plane, the iris window, the colour window
-    { static CtSceneLayers motLayers[2]; static CtFieldNativeFx motFx[2];
-      if (mot->valid && (hostInterp(pr) || getenv("CT_NATIVECHECK")) && CtFieldSceneLayers(f.sd, &motLayers[g_motIdx])) {
+    { static CtSceneLayers motLayers[2]; static CtFieldNativeFx motFx[2]; static CtSceneLayerCells motCells[2];
+      if (mot->valid && (hostInterp(pr) || getenv("CT_NATIVECHECK") || hostHd()) && CtFieldSceneLayers(f.sd, &motLayers[g_motIdx])) {
         mot->native = &motLayers[g_motIdx];
+        if (hostHd() && CtFieldSceneLayerCells(f.sd, &motCells[g_motIdx])) mot->hdCells = &motCells[g_motIdx];
         motLayers[g_motIdx].beyond = wideW > CAMW ? g_wideBeyond : 0;
         if (bg3Plane || g_bgWinOn || g_colWinOn) {     // ...and what is composed over them: the iris, the colour window, the captions
           CtFieldNativeFx* fx = &motFx[g_motIdx];

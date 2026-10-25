@@ -61,6 +61,7 @@ typedef struct CtMotFrame {
   const void* native;                     // the map's layers when the frame can be drawn natively (fieldnative.c), else NULL
   const void* nativeFx;                   // the field's iris / colour window / caption plane for the native drawer (fieldnative.h)
   const void* owNative;                   // the overworld's own (field.c OwNat) when it can be drawn natively, else NULL
+  const void* hdCells;                    // the map's pictures as cells (scene.h CtSceneLayerCells) for the HD presenter, else NULL
 } CtMotFrame;
 
 void CtMotBegin(CtMotFrame* m, int w);    // a new frame `w` pixels wide: every pixel screen-fixed, no objects
