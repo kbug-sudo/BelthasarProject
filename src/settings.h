@@ -41,6 +41,7 @@ typedef struct CtSettings {
   int widescreen;               // CT_WIDE_*: the field's picture wider than the SNES's 256 (the rest pillarboxed)
   int presenter;                // CT_PRESENTER_*: the picture as the SNES drew it, or the field redrawn from HD art at 4x
   int wideRoomWrap;             // widescreen: a room as wide as its map shows the map wrapping in the sides (else black)
+  int cutscenes;                // a mod: the player's video clips at their moments (cutscene.h); off by default
   int vsync;
   int backend;                  // present.h CT_BACKEND_*: SDL_Renderer / OpenGL / Vulkan (next start)
   char renderDriver[32];        // SDL_Renderer driver ("" = SDL's choice; "direct3d", "direct3d11", "opengl", "software")

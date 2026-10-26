@@ -32,7 +32,7 @@ if(MSVC)
 endif()
 
 # The playable host's sources (Belthasar below; the Android app's libmain.so, android/CMakeLists.cmake).
-set(CT_FIELD_SRC src/field.c src/bugreport.c src/bugreport_console.c src/hdpresent.c src/hdsrc.c src/seq_race.c src/seq_racepic.c src/seq_pic.c src/seq_ending.c src/seq_endingpic.c src/seq_entry3.c src/seq_entry3pic.c src/seq_entry4.c src/seq_entry4pic.c src/seq_entry6.c src/seq_entry6pic.c src/seq_entry7.c src/seq_entry7pic.c src/seq_gwarp.c src/scene.c src/lz.c src/assets.c src/ct_vm.c src/collision.c src/player.c src/world.c src/vwf.c src/battle.c src/objslot.c src/tileanim.c src/menu.c src/menu_cost.c src/field_cost.c src/oam.c src/settings.c src/present.c src/present_vk.c src/motion.c src/fieldnative.c
+set(CT_FIELD_SRC src/field.c src/bugreport.c src/bugreport_console.c src/cutscene.c src/hdpresent.c src/hdsrc.c src/seq_race.c src/seq_racepic.c src/seq_pic.c src/seq_ending.c src/seq_endingpic.c src/seq_entry3.c src/seq_entry3pic.c src/seq_entry4.c src/seq_entry4pic.c src/seq_entry6.c src/seq_entry6pic.c src/seq_entry7.c src/seq_entry7pic.c src/seq_gwarp.c src/scene.c src/lz.c src/assets.c src/ct_vm.c src/collision.c src/player.c src/world.c src/vwf.c src/battle.c src/objslot.c src/tileanim.c src/menu.c src/menu_cost.c src/field_cost.c src/oam.c src/settings.c src/present.c src/present_vk.c src/motion.c src/fieldnative.c
                  src/move.c src/audio.c src/sound/driver.c src/sound/lockstep.c src/sound/machine.c src/sound/coro.c src/sound/timing.c src/sound/timing_build.c src/sound/mixer.c src/sound/mixer_dsp.c src/title_intro.c src/seq_ppu.c src/seq_xlat.c src/hdma_table.c src/wipe.c src/ct_cpu_infra.c src/rom_verify.c src/rom_census.c src/romview.c src/ct_lake_state.c src/touchpad.c ${SNES_SRC})
 
 # CT_DATAFREE=ON: Belthasar loads the generated tables (src/data/*.h) from the player's pack instead of compiling them
@@ -194,6 +194,16 @@ if(CT_SDL_INC)
   if(EXISTS ${VULKAN_INC}/vulkan/vulkan.h)
     target_compile_definitions(Belthasar PRIVATE CT_HAVE_VULKAN)
     target_include_directories(Belthasar PRIVATE ${VULKAN_INC})
+  endif()
+  # THE CUTSCENE MOD's video decoder (src/cutscene.c, pl_mpeg -- tools/get_pl_mpeg.py puts the pinned header in
+  # third_party/pl_mpeg, git-ignored like ImGui). Without it the mod is compiled out and its option says so.
+  set(PLMPEG_INC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pl_mpeg)
+  if(EXISTS ${PLMPEG_INC}/pl_mpeg.h)
+    target_compile_definitions(Belthasar PRIVATE CT_HAVE_PL_MPEG)
+    target_include_directories(Belthasar PRIVATE ${PLMPEG_INC})
+    if(MSVC)   # (its IDCT table's double constants into floats: the header's own code, kept as pinned)
+      set_source_files_properties(src/cutscene.c PROPERTIES COMPILE_OPTIONS "/wd4305")
+    endif()
   endif()
   set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui)
   if(EXISTS ${IMGUI_DIR}/imgui.h)

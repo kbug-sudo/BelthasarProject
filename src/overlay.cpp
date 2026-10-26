@@ -12,6 +12,7 @@
 #include "backends/imgui_impl_vulkan.h"
 #include "present_vk.h"
 #endif
+#include "cutscene.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -207,6 +208,17 @@ extern "C" int CtOverlayFrame(void) {
                           "coloured by the game's own palettes, fades and colour math. The art is the folder CT_HD_DIR names\n"
                           "(hd\\ beside the game by default); a tile it lacks is upscaled on the spot. The game itself is\n"
                           "untouched: the same frames, the same RAM, the same saves as Vanilla.");
+      { char why[256]; int can = CtCutsceneStatus(why, sizeof why);
+        bool cs = s->cutscenes != 0, off = !can && !cs;  // (greyed only to turn on: an option left on can be turned off)
+        if (off) ImGui::BeginDisabled();
+        if (ImGui::Checkbox("Cutscenes (video clips)", &cs)) s->cutscenes = cs;
+        if (off) ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+          ImGui::SetTooltip("Your own video clips (the PS1 release's animated scenes) played at the moments they belong to:\n"
+                            "the game stops -- no frame, no sound -- while a clip plays over the window, and goes on from the\n"
+                            "same frame afterwards. Any button skips a clip. The game itself is untouched: the same frames,\n"
+                            "RAM and saves as without them. The clips and their moments are the folder CT_CUTSCENE_DIR names\n"
+                            "(cutscenes\\ beside the game by default).\n\nNow: %s", why); }
       bool vs = s->vsync != 0;
       if (ImGui::Checkbox("VSync", &vs)) { s->vsync = vs; ch |= CT_OVL_VIDEO; }
 #ifndef __ANDROID__                                        // (Android: SDL_Renderer on OpenGL ES, the only backend)

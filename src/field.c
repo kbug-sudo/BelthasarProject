@@ -45,6 +45,7 @@
 #include "settings.h"    // the player's options (ct_settings.ini), edited by the F1 overlay
 #include "overlay.h"     // the F1 options overlay (Dear ImGui; a stub without third_party/imgui)
 #include "bugreport.h"   // the bug reporter (`~`): the session's input log, its reports and their replay
+#include "cutscene.h"    // the cutscene mod: the player's video clips at their moments (pl_mpeg; compiled out without it)
 #include "hdpresent.h"   // the HD presenter (a mod): the field redrawn at 4x from HD art keyed by the original chips
 #include "hdsrc.h"       // ...and what each pixel of a picture was drawn from (recorded only while it is on)
 #include "touchpad.h"    // the on-screen virtual gamepad (a player option; on by default on Android only)
@@ -10452,6 +10453,7 @@ static int fieldOptionsModal(CtPresenter* pr, SDL_AudioDeviceID dev) {
 // log (its "THE BUG REPORTER" block) and takes a report on `~`, on a second of the DualSense's touchpad button, or at
 // CT_BUGREPORT_AT's frame.
 static long g_bugFrame = 0;                        // the session's frame: the main loop's passes since it started
+static int g_cutListed = 0;                        // the cutscene mod's clip list was read and can play (its block, below)
 static SDL_Joystick* g_bugPad = NULL;              // CT_BUGPAD (test): the virtual controller the probe drives
 static int g_bugPlay = 0;                          // CT_PLAYINPUT: this run's input is a log's, not SDL's
 static uint16_t g_bugHeldMask = 0;                 // the buttons held as the panel closed (Enter is Start's key): kept
@@ -10491,11 +10493,12 @@ static void hostBugOptions(CtPresenter* pr, char* o, size_t n) {
   snprintf(o, n, "\"interactive\": %d, \"presenter\": \"%s\", \"backend\": %d, \"window\": [%d, %d], \"fullscreen\": %d, "
                  "\"widescreen\": %d, \"picture_width\": %d, \"render_scale\": %d, \"frames_between\": %d, \"scale_mode\": %d, "
                  "\"aspect\": %d, \"filter\": %d, \"vsync\": %d, \"sync\": \"%s\", \"instant_uploads\": %d, "
-                 "\"hd_presenter\": %d",
+                 "\"hd_presenter\": %d, \"cutscenes\": %d",
            g_hostInteractive, nm, st->backend, ow, oh, st->fullscreen, st->widescreen, hostWideW(), st->renderScale,
            st->interpolate, st->scaleMode, st->aspect, st->linearFilter, st->vsync,
            st->sync == CT_SYNC_FREE ? "free" : "frame-perfect", st->instantUploads,
-           g_ctSrcOn);                                 // (the HD presenter drew this frame: its records are on, hdsrc.h)
+           g_ctSrcOn,                                  // (the HD presenter drew this frame: its records are on, hdsrc.h)
+           g_hostInteractive && st->cutscenes && g_cutListed);   // (the cutscene mod plays clips at their moments)
 }
 // An option the overlay changed, in the log: the ones that change the game's timing (free sync, instant uploads) make
 // the session's replay approximate from there -- a headless replay runs neither.
@@ -10599,6 +10602,91 @@ static int hostBugReport(CtPresenter* pr, SDL_AudioDeviceID dev, CtScene* vm, co
   return num;
 }
 
+// ---- THE CUTSCENE MOD (cutscene.h; docs/CUTSCENES.md) -------------------------------------------------------------
+// A host feature like the options: between two frames the main loop hands it the location and the story byte (read only),
+// and at a clip's moment the clip plays modal over the window -- the game stands still, no tick and no sound, and goes on
+// from that same frame. Only an interactive run reads the list; the option is the player's (settings.h, off by default).
+// The clip's picture fitted into the window at its own aspect (the clips are 16:9), black around it.
+static void hostClipRect(CtPresenter* pr, int w, int h, SDL_Rect* r) {
+  int ow = 0, oh = 0; CtPresentOutputSize(pr, &ow, &oh);
+  r->w = ow; r->h = w > 0 ? (int)((double)ow * h / w + 0.5) : oh;
+  if (r->h > oh) { r->h = oh; r->w = h > 0 ? (int)((double)oh * w / h + 0.5) : ow; }
+  r->x = (ow - r->w) / 2; r->y = (oh - r->h) / 2;
+}
+// Clip `clip` of the list, modal; 1 = the window was closed over it.
+static int hostCutscene(CtPresenter* pr, SDL_AudioDeviceID dev, int devHz, int clip) {
+  int kind = 0, loc = 0, story = 0; CtCutsceneMoment(clip, &kind, &loc, &story);
+  char at[48], err[300] = "";
+  if (kind == 0) snprintf(at, sizeof at, "power-on"); else snprintf(at, sizeof at, "loc %03X story %02X", loc, story);
+  const CtSettings* st = CtSettingsGet();
+  CtClip* c = CtClipOpen(clip, dev, devHz, st->mute ? 0 : st->volume, err, sizeof err);
+  if (!c) {
+    printf("cutscene: %s at frame %ld (%s): not played -- %s\n", CtCutsceneId(clip), g_bugFrame, at, err); fflush(stdout);
+    return 0;
+  }
+  if (dev) SDL_ClearQueuedAudio(dev);               // (the game's queued sound is not the clip's)
+  g_hostInOptions = 1; CtTouchPadReset();          // (a modal's: the clip takes the fingers)
+  static const uint8_t black[16 * 9 * 3];
+  CtPresentSetPicSize(pr, 16, 9); CtPresentUpload(pr, black);
+  // CT_CUTSCENE_SKIP=<n> (test): a key's press after the clip's n-th picture -- a player's own event, so the run takes the
+  // skip's whole path (tools/cutscene_check.py)
+  static long skipAt = -2;
+  if (skipAt == -2) { const char* e = getenv("CT_CUTSCENE_SKIP"); skipAt = e && *e ? atol(e) : -1; }
+  // CT_CUTSCENE_SHOT=<out.bmp>@<n> (probe): the window as drawn on the clip's n-th picture (the first clip that reaches it)
+  static char shotPath[512] = ""; static long shotAt = -2;
+  if (shotAt == -2) { const char* e = getenv("CT_CUTSCENE_SHOT"); const char* a = e ? strrchr(e, '@') : NULL; shotAt = -1;
+                      if (a) { snprintf(shotPath, sizeof shotPath, "%.*s", (int)(a - e), e); shotAt = atol(a + 1); } }
+  int skipped = 0, quit = 0, pushed = 0, pw = 16, ph = 9;
+  Uint64 freq = SDL_GetPerformanceFrequency(), t0 = SDL_GetPerformanceCounter(), tStart = t0;
+  while (!skipped && !quit && !CtClipEnded(c)) {
+    if (skipAt >= 0 && !pushed && CtClipPictures(c) >= skipAt) {
+      SDL_Event ev; memset(&ev, 0, sizeof ev);
+      ev.type = SDL_KEYDOWN; ev.key.windowID = SDL_GetWindowID(CtPresentWindow(pr)); ev.key.state = SDL_PRESSED;
+      ev.key.keysym.scancode = SDL_SCANCODE_SPACE; ev.key.keysym.sym = SDLK_SPACE; SDL_PushEvent(&ev); pushed = 1;
+    }
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+      if (e.type == SDL_QUIT) quit = 1;
+      else if (e.type == SDL_CONTROLLERDEVICEADDED) fieldPadOpen();
+      else if ((e.type == SDL_KEYDOWN && !e.key.repeat) || e.type == SDL_CONTROLLERBUTTONDOWN ||
+               e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_FINGERDOWN) skipped = 1;   // any button skips
+    }
+    Uint64 t1 = SDL_GetPerformanceCounter();
+    double dt = (double)(t1 - t0) / (double)freq; t0 = t1;
+    if (dt > 0.1) dt = 0.1;                          // (a stall is not a jump through the clip)
+    if (CtClipAdvance(c, dt)) {
+      const uint8_t* p = CtClipPicture(c, &pw, &ph);
+      if (p) { CtPresentSetPicSize(pr, pw, ph); CtPresentUpload(pr, p); }
+    }
+    SDL_Rect d; hostClipRect(pr, pw, ph, &d);
+    CtPresentDraw(pr, &d, 1);                        // (the clip's own pictures: smooth whatever the game's filter)
+    if (shotAt >= 0 && CtClipPictures(c) >= shotAt) {
+      int ow = 0, oh = 0; CtPresentOutputSize(pr, &ow, &oh);
+      CtPresentSaveBMP(pr, shotPath);
+      printf("cutscene-shot: %s picture %ld -> %s (%dx%d)\n", CtCutsceneId(clip), CtClipPictures(c), shotPath, ow, oh);
+      shotAt = -1;
+    }
+    CtPresentSwap(pr);
+    if (!st->vsync || g_noPace) SDL_Delay(g_noPace ? 1 : 4);
+  }
+  long pics = CtClipPictures(c), snd = CtClipSamples(c);
+  double wall = (double)(SDL_GetPerformanceCounter() - tStart) / (double)freq;
+  CtClipClose(c);
+  if (dev) SDL_ClearQueuedAudio(dev);               // (the clip's tail is not the game's)
+  if (g_hostLastUp) { CtPresentSetPicSize(pr, g_hostLastUpW, g_hostLastUpH); CtPresentUpload(pr, g_hostLastUp); }
+  hostModalClosed();
+  g_hostCursorMoveMs = SDL_GetTicks();
+  g_hostT0 = -1.0; g_hostFrames = 0;                 // the pause is not a stall to catch up on
+  g_bugHeldMask = fieldKeyPadLive();                 // (every button still down -- the one that skipped among them -- is
+                                                     //  kept from the game until let go, as after the bug panel)
+  const char* how = quit ? "the window closed" : skipped ? "skipped" : "played to its end";
+  CtBugEvent(1, "cutscene %s at %s: %s", CtCutsceneId(clip), at, how);
+  printf("cutscene: %s at frame %ld (%s): %s (%ld pictures, %ld sound frames, %.1f s)\n", CtCutsceneId(clip), g_bugFrame, at,
+         how, pics, snd, wall);
+  fflush(stdout);
+  return quit;
+}
+
 int main(int argc, char** argv) {
 #ifdef __APPLE__
   int macStatus = CtMacConfigure(&argc, &argv);
@@ -10625,6 +10713,13 @@ int main(int argc, char** argv) {
   // switch's note: the race's holds left the demo's sound 1.8 s behind). CT_XLAT_HOLDAPU=1 keeps the oracle's way.
   g_ctLogicalHoldApu = getenv("CT_XLAT_HOLDAPU") ? 1 : 0;
   if (getenv("CT_ANIMENG_SELFCHECK")) return ctAnimengSelfcheck();   // STEP-4: pose-engine gather vs the retired bake
+  if (getenv("CT_CUTSCENE_SELFTEST")) {              // the cutscene mod's moments over a scripted run (cutscene.h)
+    char why[300] = "";
+    if (!CtCutsceneLoad(NULL, why, sizeof why)) { printf("cutscene-selftest: FAIL %s\n", why); return 2; }
+    printf("cutscene-selftest: %d clip(s) listed\n", CtCutsceneCount());
+    CtCutsceneSelftest(getenv("CT_CUTSCENE_SELFTEST"));
+    return 0;
+  }
   if (getenv("CT_ENEMY_STAGE_SELFCHECK")) return ctEnemyStageSelfcheck();   // ROM-driven pose staging vs oracle (O6)
   const char* datpath = NULL; const char* shot = NULL; const char* flagsPath = NULL;
   int sprTest = 0;   // --sprtest: dump every character's menu standing sprite + its placement
@@ -12150,6 +12245,12 @@ int main(int argc, char** argv) {
     if ((getenv("CT_BUGKEYS") || getenv("CT_BUGPAD")) && getenv("CT_NOPACE")) g_hostInteractive = 1; }   // (test: the bug
                                                                                                         //  reporter's probes)
   CtSettingsLoad(g_hostInteractive);
+  // THE CUTSCENE MOD's list (cutscene.h): read by an interactive run only, so a headless one never meets a clip
+  if (g_hostInteractive) {
+    char why[300] = "";
+    g_cutListed = CtCutsceneLoad(NULL, why, sizeof why) > 0 && CtCutsceneStatus(NULL, 0);   // (clips that can play)
+    if (g_cutListed || getenv("CT_CUTSCENE_DIR")) fprintf(stderr, "[cutscene] %s\n", why);
+  }
   // the console's last lines for a bug report (bugreport_console.c): an interactive run's (or CT_BUG_CONSOLE's) output is
   // teed into a ring; a headless run's stays exactly as it was
   if ((g_hostInteractive && !getenv("CT_BUGKEYS") && !getenv("CT_BUGPAD")) || getenv("CT_BUG_CONSOLE")) CtBugConsoleStart();
@@ -12883,6 +12984,15 @@ int main(int argc, char** argv) {
       CtSettings before = *CtSettingsGet();
       if (fieldOptionsModal(pr, audioDev)) running = 0;
       hostBugOptionsChanged(&before);                // (the bug reporter's log: an option that changes the timing)
+    }
+    // THE CUTSCENE MOD (cutscene.h): a clip's moment, between two frames -- the location and the story byte as the frame
+    // before left them, read only. Every clip's moment is followed while the list is loaded, the option on or off (turned
+    // on in the middle of a moment, it plays nothing); on, the clip plays modal and the game goes on from this same frame.
+    if (g_cutListed) {
+      int due[CT_CUTSCENE_MAX];
+      int nd = CtCutsceneDue(CtWramSys(fieldWram()), g_bugFrame == 0 && bootNatural && !wramSeeded, due, CT_CUTSCENE_MAX);
+      for (int i = 0; i < nd && running && CtSettingsGet()->cutscenes; i++)
+        if (hostCutscene(pr, audioDev, audioHz, due[i])) running = 0;
     }
     // CT_OVERLAY_SHOT=<out.bmp>[@frame][:tab] (probe): at that frame (default 60) draw the overlay over the picture on
     // tab 0..3, save the window as a BMP and leave -- how the overlay is checked headless (SDL_VIDEODRIVER=dummy).

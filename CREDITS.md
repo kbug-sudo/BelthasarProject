@@ -22,6 +22,7 @@ or endorsed by Square Enix or Nintendo.
 | [SDL2](https://github.com/libsdl-org/SDL) 2.32.10 | `tools/get_sdl2.ps1` (Linux/macOS: the system package) | Window, input, audio, the 2D presenter | zlib |
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.91.5 | `tools/get_imgui.ps1` | The F1 options overlay | MIT |
 | [Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) 1.3.296 | `tools/get_vulkan_headers.ps1` | The optional Vulkan presenter | Apache-2.0 / MIT |
+| [pl_mpeg](https://github.com/phoboslab/pl_mpeg) by Dominic Szablewski, commit c871f2b | `tools/get_pl_mpeg.py` (pinned by SHA-256) | The cutscene mod's MPEG-1 video / MP2 audio decoder (docs/CUTSCENES.md) | MIT |
 
 ## Methodology
 

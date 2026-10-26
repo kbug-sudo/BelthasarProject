@@ -47368,7 +47368,7 @@
         "tools/third_party_saves.json"
       ],
       "expect": [
-        "input-provenance: 631 check(s) read 239 state file(s): 228 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
+        "input-provenance: 632 check(s) read 247 state file(s): 236 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
       ],
       "pin": [
         "^input-provenance: \\d+ check"
@@ -47886,8 +47886,8 @@
         },
         {
           "file": "src/field.c",
-          "find": "           g_ctSrcOn);                                 // (the HD presenter drew this frame: its records are on, hdsrc.h)",
-          "replace": "           0); /* MUT */",
+          "find": "           g_ctSrcOn,                                  // (the HD presenter drew this frame: its records are on, hdsrc.h)",
+          "replace": "           0, /* MUT */",
           "why": "report.json says the vanilla presenter drew a picture the HD presenter drew"
         },
         {
@@ -48453,6 +48453,253 @@
           "find": "  const int owSite = stm == &w->stm ? 9 : 12;      // (the HD presenter's records: which tilemap a cell is read from)",
           "replace": "  const int owSite = 9; /* MUT */",
           "why": "the widescreen's world view and the world's stream share their cells' keys"
+        }
+      ]
+    },
+    {
+      "name": "cutscene-session-leaves-the-game-untouched",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/cutscene_check.py"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/cutscene_check.py",
+        "tools/bugreport.py",
+        "tools/bugreport/boot_to_bedroom.log",
+        "tools/ctlib/mpeg1_clip.py",
+        "third_party/pl_mpeg/pl_mpeg.h"
+      ],
+      "expect": [
+        "cutscene-check: on: BOOT at frame 0 (power-on): skipped",
+        "cutscene-check: on: TITLE at frame 0 (loc 000 story 00): played to its end",
+        "cutscene-check: on: ROOM at frame 3055 (loc 002 story 00): played to its end",
+        "cutscene-check: on: WAKE at frame 4315 (loc 002 story 03): skipped",
+        "cutscene-check: on: 4 clip(s) played: BOOT@0 TITLE@0 ROOM@3055 WAKE@4315",
+        "cutscene-check: off: no clip played",
+        "cutscene-check: vanilla: no clip played",
+        "cutscene-check: the game untouched: vanilla, off and on identical over 4701 frames (picture, work RAM and battery)"
+      ],
+      "pin": [
+        "^cutscene-check: "
+      ],
+      "timeout_s": 900,
+      "note_pass": "the cutscene mod (src/cutscene.c) as a player turns it on -- `[video] cutscenes=on`, a clip folder, the interactive host in a hidden window driven from power-on by a virtual controller -- plays each clip at its moment (the power-on; a location and story value, once, not again when the drive comes back to the title; a story change inside a room), skips a clip on a key's press and plays a short one to its end, plays nothing for a moment the drive never meets and nothing with the option off; and the game's frames, work RAM and battery are those of the vanilla run, frame for frame",
+      "notes": "2026-10-26 (CC_Remaster_Project M7.5). tools/cutscene_check.py: three sessions side by side (vanilla / the list loaded with the option off / on), each Belthasar --boot with CT_BUGPAD (tools/bugreport/boot_to_bedroom.log), CT_NOPACE, CT_SETTINGS and CT_FRAMEHASH to the report at frame 4700; the clips made by tools/ctlib/mpeg1_clip.py (flat-grey MPEG-1 pictures and silent MP2: no video of anyone's), the skip a key event pushed after a clip's 10th picture (CT_CUTSCENE_SKIP). Needs the decoder (tools/get_pl_mpeg.py). The old code has no cutscene mod.",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "  CtClipClose(c);\n  if (dev) SDL_ClearQueuedAudio(dev);               // (the clip's tail is not the game's)",
+          "replace": "  CtClipClose(c); CtWramSys(fieldWram())[0x0300] ^= 0x10; /* MUT */\n  if (dev) SDL_ClearQueuedAudio(dev);",
+          "why": "a clip's playback writes one byte of the game's work RAM"
+        },
+        {
+          "file": "src/field.c",
+          "find": "      for (int i = 0; i < nd && running && CtSettingsGet()->cutscenes; i++)",
+          "replace": "      for (int i = 0; i < nd && running; i++) /* MUT */",
+          "why": "the clips play with the option off"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    int now = c->kind == KIND_POWER_ON ? powerOnFrame : (loc == c->loc && story == c->story);",
+          "replace": "    int now = c->kind == KIND_POWER_ON ? powerOnFrame : (loc == c->loc); /* MUT */",
+          "why": "a moment named by its location alone"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    if (c->kind == KIND_AT && story == 0 && c->story != 0) c->done = 0;",
+          "replace": "    if (c->kind == KIND_AT && !(loc == c->loc && story == c->story)) c->done = 0; /* MUT */",
+          "why": "a moment plays again when the game comes back to it (the title met twice)"
+        },
+        {
+          "file": "src/field.c",
+          "find": "               e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_FINGERDOWN) skipped = 1;   // any button skips",
+          "replace": "               e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_FINGERDOWN) skipped = 0; /* MUT */",
+          "why": "a key's press does not skip the clip"
+        },
+        {
+          "file": "src/field.c",
+          "find": "g_bugFrame == 0 && bootNatural && !wramSeeded, due, CT_CUTSCENE_MAX",
+          "replace": "0 /* MUT */, due, CT_CUTSCENE_MAX",
+          "why": "the power-on's moment never comes"
+        }
+      ]
+    },
+    {
+      "name": "cutscene-moments-once-and-again",
+      "tier": "quick",
+      "argv": [
+        "python",
+        "tools/cutscene_check.py",
+        "selftest"
+      ],
+      "env": {},
+      "inputs": [
+        "tools/cutscene_check.py",
+        "tools/bugreport.py"
+      ],
+      "expect": [
+        "cutscene-selftest: 5 clip(s) listed",
+        "cutscene-selftest: 0 power-on: BOOT",
+        "cutscene-selftest: 1 loc 000 story 00: -",
+        "cutscene-selftest: 2 loc 0E2 story 37: ROOM",
+        "cutscene-selftest: 3 loc 0E3 story 37: -",
+        "cutscene-selftest: 4 loc 0E2 story 37: -",
+        "cutscene-selftest: 5 loc 000 story 00: -",
+        "cutscene-selftest: 6 loc 0E2 story 37: ROOM",
+        "cutscene-selftest: 7 loc 0A3 story 84: -",
+        "cutscene-selftest: 8 loc 0A3 story 84 (a byte set): -",
+        "cutscene-selftest: 9 loc 0A3 story 84 (a byte set): SPLIT",
+        "cutscene-selftest: 10 loc 1F1 story 84 (a byte set): -",
+        "cutscene-selftest: 11 loc 110 story 40 (a byte set): -",
+        "cutscene-selftest: 12 loc 0A3 story 84 (a byte set): -",
+        "cutscene-selftest: 13 loc 0F3 story AB (a byte set): -",
+        "cutscene-selftest: 14 loc 0F3 story AB (a byte set): FLAG",
+        "cutscene-selftest: 15 loc 127 story 90: -",
+        "cutscene-selftest: 16 loc 127 story 93: LIFT",
+        "cutscene-selftest: 17 loc 1F3 story 93: -",
+        "cutscene-selftest: 18 loc 127 story 93: -",
+        "cutscene-selftest: 19 loc 000 story 00: -",
+        "cutscene-selftest: 20 loc 127 story 93: -"
+      ],
+      "pin": [
+        "^cutscene-selftest: "
+      ],
+      "timeout_s": 120,
+      "note_pass": "the cutscene mod's moments (CtCutsceneDue) over a scripted run of location / story / byte values: the power-on; a location and story once, not again on walking back in; again after the story byte was 00 (the title, where every reload passes) and not after a time gate's warp held 40 in it; a moment that also names a byte of the scene's own only when the byte holds its value, once",
+      "notes": "2026-10-26 (CC_Remaster_Project M7.5). CT_CUTSCENE_SELFTEST (src/cutscene.c CtCutsceneSelftest): no video and no game; the list written by tools/cutscene_check.py selftest. The byte condition is the Magic Cave's case on the cartridge: location 0A3 and story 84 hold three times in one scene, and only $7F:0057 = 03 marks the split (the remaster's docs/fmv_manifest.json). The old code has no cutscene mod.",
+      "mutations": [
+        {
+          "file": "src/cutscene.c",
+          "find": "    if (c->kind == KIND_AT && story == 0 && c->story != 0) c->done = 0;",
+          "replace": "    /* MUT: never re-armed */",
+          "why": "a moment met again after the story fell below it (a save from before it) plays nothing"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    for (int k = 0; k < c->ncond && now; k++) now = (w[c->condAt[k]] & c->condMask[k]) == c->condVal[k];",
+          "replace": "    /* MUT: the bytes not read */",
+          "why": "a moment's own byte condition ignored: the split fires on the scene's first frame"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "now = (w[c->condAt[k]] & c->condMask[k]) == c->condVal[k];",
+          "replace": "now = w[c->condAt[k]] == c->condVal[k]; /* MUT */",
+          "why": "a flag byte compared whole: another event's bit hides the moment"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    if (c->kind == KIND_AT && story == 0 && c->story != 0) c->done = 0;",
+          "replace": "    if (c->kind == KIND_AT && !(loc == c->loc && story == c->story)) c->done = 0; /* MUT */",
+          "why": "walking back into the room plays the moment again"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    if (c->kind == KIND_AT && story == 0 && c->story != 0) c->done = 0;",
+          "replace": "    if (c->kind == KIND_AT && story < c->story) c->done = 0; /* MUT */",
+          "why": "re-armed whenever the byte falls below the moment: a time gate's warp (40 in the byte) replays it"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "    if (c->onChange && now) now = loc == g_prevLoc && story != g_prevStory;   // (a load changes the location too)",
+          "replace": "    /* MUT: story_change not read */",
+          "why": "a story_change moment holds on any later visit: a save loaded at the summit plays the take-off again"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "now = loc == g_prevLoc && story != g_prevStory;",
+          "replace": "now = story != g_prevStory; /* MUT */",
+          "why": "a load (the title to the summit) taken for the story changing inside the location"
+        }
+      ]
+    },
+    {
+      "name": "cutscene-decoder-is-the-pinned-pl-mpeg",
+      "tier": "quick",
+      "argv": [
+        "python",
+        "tools/get_pl_mpeg.py",
+        "--check"
+      ],
+      "env": {},
+      "inputs": [
+        "tools/get_pl_mpeg.py",
+        "third_party/pl_mpeg/pl_mpeg.h"
+      ],
+      "expect": [
+        "pl_mpeg: pinned c871f2b sha256 3a8cb30c83c2a114 ok"
+      ],
+      "pin": [
+        "^pl_mpeg: "
+      ],
+      "timeout_s": 60,
+      "note_pass": "the cutscene mod's decoder is pl_mpeg at the pinned commit, byte for byte (its SHA-256)",
+      "notes": "2026-10-26 (CC_Remaster_Project M7.5). tools/get_pl_mpeg.py fetches github.com/phoboslab/pl_mpeg (MIT) at commit c871f2b and refuses a file whose SHA-256 is not the pin; --check grades the header the build compiles. The old code has no decoder.",
+      "mutations": [
+        {
+          "file": "tools/get_pl_mpeg.py",
+          "find": "SHA256 = \"3a8cb30c83c2a1147719c30fe0c8b93da2987aa43140077c575b39aaa75fc2c9\"",
+          "replace": "SHA256 = \"3a8cb30c83c2a1147719c30fe0c8b93da2987aa43140077c575b39aaa75fc2c8\"  # MUT",
+          "why": "the pin is another file's"
+        }
+      ]
+    },
+    {
+      "name": "cutscene-moments-vs-cartridge",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/cutscene_moments.py"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "tools/cutscene_moments.py",
+        "tools/ctlib/mpeg1_clip.py",
+        "third_party/pl_mpeg/pl_mpeg.h",
+        "tools/recipes/lg_ocean_palace_19f.json",
+        "saves/cutscene_re/m1_pre.state",
+        "saves/cutscene_re/m2_pre.state",
+        "saves/cutscene_re/m3_pre.state",
+        "saves/cutscene_re/m4_pre.state",
+        "saves/cutscene_re/m5_pre.state",
+        "saves/cutscene_re/m6_pre.state",
+        "saves/cutscene_re/m7_pre.state",
+        "saves/cutscene_re/ending_pre.state"
+      ],
+      "expect": [
+        "cutscene-moment: M1 at 0E2 37: cartridge f2217, engine M1 f2218",
+        "cutscene-moment: M2 at 111 6C 7E29AE=0B: cartridge f803, engine M2 f806",
+        "cutscene-moment: M3 at 0A3 84 7F0057=03: cartridge f8725, engine M3 f8724",
+        "cutscene-moment: M4 at 0AC 89: cartridge f66, engine M4 f67",
+        "cutscene-moment: M5 at 127 93 story_change: cartridge f1097, engine M5 f1096",
+        "cutscene-moment: M6 at 0F3 AE story_change: cartridge f259, engine M6 f260",
+        "cutscene-moment: M7 at 1A7 C9 7E29AE=0D: cartridge f8859, engine M7 f8860",
+        "cutscene-moment: ENOSP1+ENOSP2 at 05A D6 7E0384=00: cartridge f8628, engine ENOSP1 f8629 then ENOSP2 f8629",
+        "cutscene-moments: every moment met on both sides"
+      ],
+      "pin": [
+        "^cutscene-moment"
+      ],
+      "timeout_s": 2400,
+      "note_pass": "every clip's moment the remaster placed (docs/fmv_manifest.json) -- Proto Dome's door, Ayla's song at Mystic Mts (she leaps in), the Masamune raised, Magus's hall, the Dactyls' take-off, the Epoch boarded, Crono rising against Lavos (his song, the party down), the end of the staff roll (The End: the wedding, then the Fall of Guardia, in that order) -- is met from its recipe's state with the same pad on the cartridge (ct.exe --monitor) and on the engine, where the cutscene mod itself (its list holding that moment) names the frame",
+      "notes": "2026-10-26 (CC_Remaster_Project M7.5). tools/cutscene_moments.py over tools/fixtures/cutscenes.json (recipes cut_*_pre from public battery saves by play, lg_ocean_palace_1a7_pre split out of lg_ocean_palace_19f, lg_end_handoff_f6837). The engine's frame is the cartridge's + 1 where the two run in step (a clip plays at the top of the next frame); M2's, M3's and M5's offsets are the port's own (informational, pinned). M2 starts after the Reptites' two fights (the engine's fights run their own pace: an open finding). The old code has no cutscene mod.",
+      "mutations": [
+        {
+          "file": "src/cutscene.c",
+          "find": "    for (int k = 0; k < c->ncond && now; k++) now = (w[c->condAt[k]] & c->condMask[k]) == c->condVal[k];",
+          "replace": "    /* MUT: the bytes not read */",
+          "why": "the bytes ignored: Ayla's, the Masamune's and Crono's moments fire as their scenes begin"
+        },
+        {
+          "file": "src/cutscene.c",
+          "find": "  int loc = (w[0x0100] | (w[0x0101] << 8)) & 0x1FF, story = w[0x10000], n = 0;",
+          "replace": "  int loc = w[0x0100], story = w[0x10000], n = 0; /* MUT */",
+          "why": "the location's ninth bit dropped: Mystic Mts (111) and the Dactyls' summit (127) never met"
         }
       ]
     }

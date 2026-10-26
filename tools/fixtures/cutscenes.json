@@ -1,0 +1,13 @@
+{
+  "doc": "The cutscene mod's moments (docs/CUTSCENES.md; the remaster's docs/fmv_manifest.json): for each, a state a little before it, reached on the cartridge from a public battery save by play (tools/recipes/cut_*_pre.json, lg_ocean_palace_1a7_pre, lg_end_handoff_f6837). tools/cutscene_moments.py plays each moment from here on the cartridge and on the engine.",
+  "fixtures": [
+    {"path": "saves/cutscene_re/m1_pre.state", "recipe": "cut_m1_pre", "kind": "state", "doc": "Lab 32's east end (0E1), story 37: out to the world map and in at Proto Dome's door"},
+    {"path": "saves/cutscene_re/m2_pre.state", "recipe": "cut_m2_pre", "kind": "state", "doc": "Mystic Mts (111), story 6C: the Reptites' two fights won, the party surrounded again before Ayla leaps in"},
+    {"path": "saves/cutscene_re/m3_pre.state", "recipe": "cut_m3_pre", "kind": "state", "doc": "the Magic Cave's entrance (0A3), story 84, its scene begun"},
+    {"path": "saves/cutscene_re/m4_pre.state", "recipe": "cut_m4_pre", "kind": "state", "doc": "the Lair's stairs (1BF), story 89, their fight won: the door to the throne room ahead"},
+    {"path": "saves/cutscene_re/m5_pre.state", "recipe": "cut_m5_pre", "kind": "state", "doc": "the Dactyl Nest's summit (127), story 90, the meeting under way"},
+    {"path": "saves/cutscene_re/m6_pre.state", "recipe": "cut_m6_pre", "kind": "state", "doc": "the Epoch's hangar (0F3), story AB, at the Epoch's anchor"},
+    {"path": "saves/cutscene_re/m7_pre.state", "recipe": "lg_ocean_palace_1a7_pre", "kind": "state", "doc": "the Ocean Palace's 19F, story C9, before the fight with Lavos, Lavos's chamber and Crono rising"},
+    {"path": "saves/cutscene_re/ending_pre.state", "recipe": "lg_end_handoff_f6837", "kind": "state", "doc": "scene 90 (05A) after the epilogues, story D6, the frame before FF 2E (the staff roll's last part and The End)"}
+  ]
+}

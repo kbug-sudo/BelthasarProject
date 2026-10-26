@@ -119,10 +119,11 @@ For experimental macOS support, see the [local app build guide](docs/MACOS.md).
 powershell -ExecutionPolicy Bypass -File tools\get_sdl2.ps1            :: SDL2 -> third_party\SDL2
 powershell -ExecutionPolicy Bypass -File tools\get_imgui.ps1           :: Dear ImGui -> third_party\imgui (the F1 overlay)
 powershell -ExecutionPolicy Bypass -File tools\get_vulkan_headers.ps1  :: Vulkan headers -> third_party\vulkan (optional backend)
+python tools\get_pl_mpeg.py                                            :: pl_mpeg -> third_party\pl_mpeg (the cutscene mod)
 ```
 
 Without SDL2 only the headless oracle harness `ct.exe` is built. Without ImGui `Belthasar` builds with no overlay.
-Without the Vulkan headers the Vulkan backend is left out. On Linux and macOS, use the system SDL2 and fetch ImGui
+Without the Vulkan headers the Vulkan backend is left out. Without pl_mpeg the cutscene mod (docs/CUTSCENES.md) is left out. On Linux and macOS, use the system SDL2 and fetch ImGui
 with `python3 tools/get_imgui.py`.
 
 ### 2. Set up from your ROM

@@ -7,8 +7,10 @@
 *.sfc
 *.smc
 *.srm
-# The F5 debug snapshots' log (src/field.c), written where the game runs
+# The F5 debug snapshots' log and their states (src/field.c), written where the game runs
 ct_debug_log.txt
+ct_debug.state*
+ct_debug_*.state*
 # The bug reporter's reports (src/bugreport.c, CT_BUG_DIR's default) hold the game's state and pictures
 /bug_reports/
 # The HD presenter's art (src/hdpresent.c, CT_HD_DIR's default `hd`): its packs hold the ROM's decoded tiles
@@ -31,6 +33,10 @@ dump.bin
 /third_party/SDL2-src/
 /third_party/imgui/
 /third_party/vulkan/
+/third_party/pl_mpeg/
+# The cutscene mod's clips (src/cutscene.c, CT_CUTSCENE_DIR's default `cutscenes`): a player's own video, never published
+/cutscenes/
+*.mpg
 
 # Execution traces are large and regenerable (ct.exe --trace > ...)
 disasm/boot_trace*.txt

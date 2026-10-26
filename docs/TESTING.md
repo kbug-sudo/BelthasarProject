@@ -2587,6 +2587,41 @@ line), every texel it recorded names the index drawn (`srccheck:`, CT_SRCCHECK i
 presenter drew, and the report taken at frame 4700 in Crono's room replays exactly with every mod off. With `--fullscreen` and a
 real video driver the same command runs at the desktop's size on the player's backend (the remaster's 1080p run).
 
+### cutscene-session-leaves-the-game-untouched (`python tools/cutscene_check.py`)
+
+The cutscene mod (docs/CUTSCENES.md) as a player turns it on: the same session from power-on as the HD presenter's
+(hidden window, virtual controller on tools/bugreport/boot_to_bedroom.log, report at frame 4700), three times side by side
+-- vanilla; the clip list loaded with the option off; `[video] cutscenes=on` -- each writing `CT_FRAMEHASH`. The clips are
+made by the check (tools/ctlib/mpeg1_clip.py), the list names every kind of moment the drive meets: the power-on, the
+title's location and story (met again later: not replayed), Crono's room as the opening enters it, the story byte moving
+inside the room, and a moment the drive never meets. Graded: the four clips played at their frames, skipped (a key pushed
+after the 10th picture, CT_CUTSCENE_SKIP) or played to the end; nothing played with the option off; the three hash files
+the same over 4701 frames. Mutations: a playback that writes a byte of the work RAM, the option ignored, a moment named by
+its location alone, a moment replayed when the game comes back to it, a key that does not skip, the power-on missed.
+
+### cutscene-moments-once-and-again (`python tools/cutscene_check.py selftest`)
+
+The moments alone (`CT_CUTSCENE_SELFTEST`): once; not again on walking back into the room; again after the story byte was
+00 (the title, where every reload passes); not again after a time gate's warp held 40 in the byte; a moment that also names a byte of the scene's own (the Magic Cave's
+`7F0057=03`) only when the byte holds it; a bit of an event-flag byte (`7F00EE&02=02`) with another bit of the byte set;
+a `story_change` moment (the Dactyls' take-off) only on the frame the story becomes its value inside the location -- not
+on a load straight into it, not on a later visit.
+
+### cutscene-moments-vs-cartridge (`python tools/cutscene_moments.py`)
+
+Every moment the remaster placed its clips at (its docs/fmv_manifest.json), from a state a little before it
+(tools/fixtures/cutscenes.json: recipes played on the cartridge from public battery saves), the same pad on both sides:
+the cartridge (`ct.exe --monitor` under the rule) names the first frame the moment holds, the engine (the cutscene mod on,
+a list holding that moment and a five-picture clip) the frame its own `cutscene:` line names. One pinned line a moment
+(`cutscene-moment: M2 at 111 6C 7E29AE=0B: cartridge f803, engine M2 f806`); the ending's two clips (the wedding, then
+the Fall of Guardia, at "The End") must play in that order. The engine is the cartridge's + 1 where the two run in step;
+M2's, M3's and M5's offsets are the port's own. M2's state is after the Reptites' two fights (the engine's fights run
+their own pace: an open finding). Mutations: the moment's bytes not read; the location's ninth bit dropped.
+
+### cutscene-decoder-is-the-pinned-pl-mpeg (`python tools/get_pl_mpeg.py --check`)
+
+`third_party/pl_mpeg/pl_mpeg.h` is pl_mpeg at commit c871f2b, by its SHA-256. SKIPs without the header.
+
 ### hd-presenter-records-name-the-texels-drawn (`Belthasar --scene 433 --frames 11000 --selftest`, `CT_SRCCHECK=1`)
 
 The HD presenter's records (src/hdsrc.c: what each pixel was drawn from -- a source's content, one draw of it with its

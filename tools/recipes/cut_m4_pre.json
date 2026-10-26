@@ -1,0 +1,24 @@
+{
+  "name": "cut_m4_pre",
+  "doc": "The cutscene mod's moment M4 (the remaster's docs/fmv_manifest.json), reached on the cartridge from a public battery save by play (no pokes): Magus (his throne room): the Lair's save point, the warp, the stairs and their fight won. tools/cutscene_moments.py plays the moment from here on both sides.",
+  "steps": [
+    [
+      "sram_file",
+      "saves/public/fantasyanime/ctsave07-azala.srm"
+    ],
+    [
+      "power_on",
+      133
+    ],
+    [
+      "pad",
+      "0:300,8:2,0:120,10:2,0:10,10:2,0:10,0:30,100:2,0:10,100:2,0:300,40:96,0:64,0:90,40:16,60:96,60:160,60:400,40:96,10:8,40:48,20:8,40:48,10:8,40:48,20:8,40:48,0:68,100:2,0:16,100:2,0:246,100:2,0:16,100:2,0:578,100:2,0:16,100:2,0:186,100:2,0:16,100:2,0:298,100:2,0:16,100:2,0:10,100:2,0:16,100:2,0:498,100:2,0:16,100:2,0:222,100:2,0:16,100:2,0:1158,40:6"
+    ]
+  ],
+  "expect": {
+    "loc": "0x1BF",
+    "wram": {
+      "0x10000": "0x89"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "cut_m3_pre",
+  "doc": "The cutscene mod's moment M3 (the remaster's docs/fmv_manifest.json), reached on the cartridge from a public battery save by play (no pokes): the Masamune (the Magic Cave): A on the entrance, the scene begun in 0A3. tools/cutscene_moments.py plays the moment from here on both sides.",
+  "steps": [
+    [
+      "sram_file",
+      "saves/public/fantasyanime/ctsave06-magus_castle.srm"
+    ],
+    [
+      "power_on",
+      133
+    ],
+    [
+      "pad",
+      "0:300,8:2,0:120,10:2,0:10,10:2,0:10,100:2,0:300,100:4,0:200"
+    ]
+  ],
+  "expect": {
+    "loc": "0x0A3",
+    "wram": {
+      "0x10000": "0x84"
+    }
+  }
+}

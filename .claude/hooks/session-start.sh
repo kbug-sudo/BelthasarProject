@@ -21,6 +21,11 @@ if [ ! -f third_party/imgui/imgui.h ]; then
   python3 tools/get_imgui.py >/dev/null 2>&1 || echo "session-start: Dear ImGui did not fetch -- Belthasar builds without the overlay"
 fi
 
+# pl_mpeg (the cutscene mod's decoder), pinned by its SHA-256; tools/get_pl_mpeg.py falls back to git likewise.
+if [ ! -f third_party/pl_mpeg/pl_mpeg.h ]; then
+  python3 tools/get_pl_mpeg.py >/dev/null 2>&1 || echo "session-start: pl_mpeg did not fetch -- Belthasar builds without the cutscene mod"
+fi
+
 # The public battery saves (verified by SHA-256). Some hosts may be outside the environment's network policy.
 python3 tools/fetch_saves.py 2>&1 | tail -1 || true
 

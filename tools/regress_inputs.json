@@ -236,6 +236,8 @@
         "collision-shape-decode",
         "collision-solidat",
         "collision-sweep-microexec",
+        "cutscene-moments-vs-cartridge",
+        "cutscene-session-leaves-the-game-untouched",
         "datverify-512x3",
         "ending-ff2a-picture-native-vs-oracle",
         "ending-ff2b-picture-native-vs-oracle",
@@ -1139,6 +1141,8 @@
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides",
         "camera-reenter-scene5",
+        "cutscene-moments-vs-cartridge",
+        "cutscene-session-leaves-the-game-untouched",
         "datverify-512x3",
         "ending-chain-after-lavos-in-the-port",
         "ending-ff2b-story-picture-in-the-port-vs-oracle",
@@ -3264,6 +3268,102 @@
       "present_when_recorded": true
     },
     {
+      "path": "saves/cutscene_re/ending_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe lg_end_handoff_f6837 (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "5fe920e76fb9754c9d8b3ed496d855e21cc7aeb77061e902f6fe26ae6d4fae6d",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m1_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m1_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "0f6894db70c7232e77d7578a6e13b8d9e05e019227dd4f17043b78aa3c4034b4",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m2_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m2_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "29ef0efd4a842499a2ff90271f479b607b591a9ed5ad2e45cadec7f42cedd043",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m3_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m3_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "045732d23be27759d21c33b2968b80c1b141951f9e3c819c602a67ab38e163ee",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m4_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m4_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "1379864d4d5dbbe0af44a44fc4f67fe17adc0d85da5fec451cc9b1982d785230",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m5_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m5_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "be75dc44ceaf3dd66a0ba78d848cec95b0fd676a1e1df511613954d7ff9d501f",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m6_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe cut_m6_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "57e6e3e81eed7d50c00724dc91095def5f52afb72a8fadd531b480569c37805e",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
+      "path": "saves/cutscene_re/m7_pre.state",
+      "kind": "fixture_state",
+      "regenerable": true,
+      "how": "Made from the ROM by `python tools/fixtures.py make`: recipe lg_ocean_palace_1a7_pre (tools/fixtures/cutscenes.json)",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "0893dc1b9f57040ce624e556d3bf1a7c6f852c0483ca21c7a9edde72deca8562",
+      "size": 273125,
+      "present_when_recorded": true
+    },
+    {
       "path": "saves/downloaded/ctjackie/srm/ch02.srm",
       "kind": "public_save",
       "regenerable": true,
@@ -5341,8 +5441,8 @@
         "boot-title-opening-no-false-start-vs-rule-cartridge",
         "ow-ferry-both-ways-vs-rule-cartridge"
       ],
-      "sha256": "08fd450e23c79a509e7d8e08613b5a1be49cffe0dc5170c08500f5730d8d80e1",
-      "size": 1727441,
+      "sha256": "99e1dbd97b06961de57ff8ea4ac8233d8fa464df124bd4a4b00764ba9a7772fd",
+      "size": 1734955,
       "present_when_recorded": true
     },
     {
@@ -5434,6 +5534,20 @@
       ],
       "sha256": "e5b050610d65eaf22a3a5b1ff788b8fa99bf9e722f0c3f4fb0f900c2599e72bd",
       "size": 863079,
+      "present_when_recorded": true
+    },
+    {
+      "path": "third_party/pl_mpeg/pl_mpeg.h",
+      "kind": "unknown",
+      "regenerable": false,
+      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "used_by": [
+        "cutscene-decoder-is-the-pinned-pl-mpeg",
+        "cutscene-moments-vs-cartridge",
+        "cutscene-session-leaves-the-game-untouched"
+      ],
+      "sha256": "3a8cb30c83c2a1147719c30fe0c8b93da2987aa43140077c575b39aaa75fc2c9",
+      "size": 141424,
       "present_when_recorded": true
     },
     {
@@ -5753,6 +5867,8 @@
         "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides",
+        "cutscene-moments-once-and-again",
+        "cutscene-session-leaves-the-game-untouched",
         "hd-presenter-in-16-9-through-a-fight",
         "hd-presenter-in-the-players-presentation"
       ],
@@ -5769,10 +5885,49 @@
         "bugreport-live-pad-records-what-the-player-pressed",
         "bugreport-panel-takes-a-report",
         "bugreport-report-replays-on-both-sides",
+        "cutscene-session-leaves-the-game-untouched",
         "hd-presenter-in-the-players-presentation"
       ],
       "sha256": "6f06d92f8bf2b74f05a7f2749a81f771f9b793fd881a05d159334b86a95a31bf",
       "size": 1626,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/ctlib/mpeg1_clip.py",
+      "kind": "unknown",
+      "regenerable": false,
+      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "used_by": [
+        "cutscene-moments-vs-cartridge",
+        "cutscene-session-leaves-the-game-untouched"
+      ],
+      "sha256": "c6088e3cd27214d8d66b2fa1879b6cbf6b086cba33b0075751e6470012a19638",
+      "size": 5361,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/cutscene_check.py",
+      "kind": "unknown",
+      "regenerable": false,
+      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "used_by": [
+        "cutscene-moments-once-and-again",
+        "cutscene-session-leaves-the-game-untouched"
+      ],
+      "sha256": "26a32beb942d5b06f2a2550485b152ca77a191833ede4f7dde1dbb40e41e8430",
+      "size": 9004,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/cutscene_moments.py",
+      "kind": "unknown",
+      "regenerable": false,
+      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "b6ed3c0d2651d0b572a987a9d2837573e27b0d152aac480a6f911cbc8dc56387",
+      "size": 8574,
       "present_when_recorded": true
     },
     {
@@ -6043,6 +6198,18 @@
       ],
       "sha256": "aecfc7e3da7e88130eebd4d8f5982faac8ed7607806d87f03aa2bfe7912118c7",
       "size": 7018,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/get_pl_mpeg.py",
+      "kind": "unknown",
+      "regenerable": false,
+      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "used_by": [
+        "cutscene-decoder-is-the-pinned-pl-mpeg"
+      ],
+      "sha256": "51d9794c3fd34446c924f15bdef7f2dd779ce71688be69c1726a2cf6fc5d09d9",
+      "size": 3288,
       "present_when_recorded": true
     },
     {
@@ -6455,6 +6622,18 @@
       ],
       "sha256": "b2080738977deeb19915183971e8ba0f5fe0394206f43d5434ae87f306c5ea61",
       "size": 11941,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/recipes/lg_ocean_palace_19f.json",
+      "kind": "tool",
+      "regenerable": false,
+      "how": "In git: the file at the checked-out commit.",
+      "used_by": [
+        "cutscene-moments-vs-cartridge"
+      ],
+      "sha256": "afca5cd51cccb083072e5581da705fa6c1a63a0d7aadeb439466b399b2355d89",
+      "size": 3304,
       "present_when_recorded": true
     },
     {
