@@ -5894,9 +5894,9 @@
     },
     {
       "path": "tools/ctlib/mpeg1_clip.py",
-      "kind": "unknown",
+      "kind": "tool",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "cutscene-moments-vs-cartridge",
         "cutscene-session-leaves-the-game-untouched"
@@ -5907,9 +5907,9 @@
     },
     {
       "path": "tools/cutscene_check.py",
-      "kind": "unknown",
+      "kind": "tool",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "cutscene-moments-once-and-again",
         "cutscene-session-leaves-the-game-untouched"
@@ -5920,14 +5920,14 @@
     },
     {
       "path": "tools/cutscene_moments.py",
-      "kind": "unknown",
+      "kind": "tool",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "cutscene-moments-vs-cartridge"
       ],
-      "sha256": "b6ed3c0d2651d0b572a987a9d2837573e27b0d152aac480a6f911cbc8dc56387",
-      "size": 8574,
+      "sha256": "14c052def2f862787ce58767ab9136be92aeb34acb34b9c9e926bbbbebfb88fc",
+      "size": 8831,
       "present_when_recorded": true
     },
     {
@@ -6202,9 +6202,9 @@
     },
     {
       "path": "tools/get_pl_mpeg.py",
-      "kind": "unknown",
+      "kind": "tool",
       "regenerable": false,
-      "how": "Auto-added from regress_checks.json; fill in provenance.",
+      "how": "In git: the file at the checked-out commit.",
       "used_by": [
         "cutscene-decoder-is-the-pinned-pl-mpeg"
       ],

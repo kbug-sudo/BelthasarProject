@@ -17,10 +17,11 @@ before it); from that state:
     plays at the top of the frame after the one that left the moment, so the engine's frame is the cartridge's + 1 where
     the two run in step.
 
-One line a moment: `cutscene-moment: M2 at 111 6C: cartridge f759, engine M2 f760` (two clips at one moment -- the ending's
+One line a moment: `cutscene-moment: M4 at 0AC 89: cartridge f66, engine M4 f67` (two clips at one moment -- the ending's
 wedding, then the Fall of Guardia -- are listed in order and must play in it). A moment the engine does not meet says so.
 The moments are the remaster's (its tools/fmv.py writes the same grammar); M1's pad presses A a few frames after the world
-map's entrance latch (pressed one frame before it, the cartridge enters and the engine does not: an open finding).
+map's entrance latch (pressed one frame before it, the cartridge enters and the engine does not: an open finding); M2's
+state is after the Reptites' two fights (the engine's fights run their own pace: an open finding).
 """
 import json
 import os
