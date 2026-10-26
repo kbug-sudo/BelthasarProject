@@ -578,10 +578,12 @@
         "harness-play-goal-and-failure",
         "hd-presenter-changes-nothing-of-the-game",
         "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+        "hd-presenter-draws-mode-7-at-4x",
         "hd-presenter-field-animated-tiles-at-4x",
         "hd-presenter-field-equals-the-frame-at-4x",
         "hd-presenter-in-16-9-through-a-fight",
         "hd-presenter-in-the-players-presentation",
+        "hd-presenter-records-hold-in-16-9",
         "hd-presenter-records-name-the-texels-drawn",
         "hd-presenter-records-name-the-texels-drawn-in-a-battle",
         "hd-presenter-turns-off-and-on",
@@ -1507,10 +1509,12 @@
         "hd-automatic-pass-writes-the-same-pack",
         "hd-presenter-changes-nothing-of-the-game",
         "hd-presenter-draws-a-sub-screen-room-in-a-fight",
+        "hd-presenter-draws-mode-7-at-4x",
         "hd-presenter-field-animated-tiles-at-4x",
         "hd-presenter-field-equals-the-frame-at-4x",
         "hd-presenter-in-16-9-through-a-fight",
         "hd-presenter-in-the-players-presentation",
+        "hd-presenter-records-hold-in-16-9",
         "hd-presenter-records-name-the-texels-drawn",
         "hd-presenter-records-name-the-texels-drawn-in-a-battle",
         "hd-presenter-refuses-art-past-its-palette",
@@ -4693,7 +4697,8 @@
         "field-scene8-gate-portal-draws-inside-window",
         "field-scene8-gate-warp-every-frame-vs-oracle",
         "field-scene8-gate-warp-flow",
-        "field-scene8-objpal-sweep-demo-sparkle"
+        "field-scene8-objpal-sweep-demo-sparkle",
+        "hd-presenter-draws-mode-7-at-4x"
       ],
       "kind": "fixture_flags",
       "regenerable": true,
@@ -5336,8 +5341,8 @@
         "boot-title-opening-no-false-start-vs-rule-cartridge",
         "ow-ferry-both-ways-vs-rule-cartridge"
       ],
-      "sha256": "aaaf58d27abe102092b03cd20284a467a9b682d6c42a434ce0d6f83ac0d02ae2",
-      "size": 1726151,
+      "sha256": "08fd450e23c79a509e7d8e08613b5a1be49cffe0dc5170c08500f5730d8d80e1",
+      "size": 1727441,
       "present_when_recorded": true
     },
     {
@@ -5751,8 +5756,8 @@
         "hd-presenter-in-16-9-through-a-fight",
         "hd-presenter-in-the-players-presentation"
       ],
-      "sha256": "ce7a9f002e93dbd2d5afc3edf1106efebecd183837c6aa362f65adab4cf92aef",
-      "size": 34844,
+      "sha256": "be79fc640e5a9632df4ba88db1d6de0b01be7844dfaf75bd9395f0e9f7721617",
+      "size": 34988,
       "present_when_recorded": true
     },
     {
@@ -6051,8 +6056,8 @@
         "hd-presenter-in-16-9-through-a-fight",
         "hd-presenter-in-the-players-presentation"
       ],
-      "sha256": "fc28ac385e87895961b9871e38fbdb666abe2f7906411b3e6a63a7ebaa2c100f",
-      "size": 15302,
+      "sha256": "539ecb678b8d0efe777567a6278a595dc61d5691f73a0dc81f0bb49e999118f8",
+      "size": 15318,
       "present_when_recorded": true
     },
     {
@@ -6474,6 +6479,18 @@
       ],
       "sha256": "0301940eb25e5e9ea1a77c144224b93cdbe15a9ec1fac55db873b3392504ed43",
       "size": 4100,
+      "present_when_recorded": true
+    },
+    {
+      "path": "tools/settings/wide_16_9_hd.ini",
+      "kind": "tool",
+      "regenerable": false,
+      "how": "In git: the file at the checked-out commit.",
+      "used_by": [
+        "hd-presenter-records-hold-in-16-9"
+      ],
+      "sha256": "c2c87341cb2d89e2abf46211e8f164a51d9af19c75bedf5da60b382ec0c4f372",
+      "size": 158,
       "present_when_recorded": true
     },
     {

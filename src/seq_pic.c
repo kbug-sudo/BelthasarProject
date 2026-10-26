@@ -3,6 +3,7 @@
 #include "hdsrc.h"   // the HD presenter's records of what each pixel was drawn from (recorded only while it is on)
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // The layer order of each mode, front to back (0-3 the BGs, 4 the OBJ, 5 none), with the priority each entry takes; 8 is mode
 // 1 with BG3's priority bit ($2105 bit 3), 9 mode 7 with EXTBG ($2133 bit 6). The bit depth of each BG by mode (5 = none).
@@ -99,10 +100,17 @@ typedef struct {
   int m7sx, m7sy;
   uint8_t objPix[256], objPri[256];
   uint32_t objTag[256];                     // (the HD presenter's record of each OBJ pixel: hdsrc.h; 0 none)
+  int hdOn, hdI, hdJ;                       // (the HD presenter's 4x mode-7 drawing: this column's sub-sample (I, J) / 4)
 } Line;
 // THE HD PRESENTER'S RECORDS (hdsrc.h): the picture being drawn, and the record of the main screen's pixel pixel() just
 // chose (0 = none: the backdrop, a mode-7 or direct-colour pixel).
 static uint8_t* g_seqRecPic; static uint32_t g_seqTag;
+// THE HD PRESENTER'S MODE 7 (hdsrc.h CtSrcNative): while it records, a mode-7 line is drawn a second time at 4x -- each
+// pixel's 16 sub-samples, the plane read at (x + I/4, y + J/4) through the line's own matrix, every other part of the
+// pipeline (the windows, the sprites, the colour math, the brightness) the pixel's -- into g_seqHd; any other line is its
+// pixels 4x4. A mode-7 plane has no tiles a record could name: this is its HD picture. Nothing of the game reads it.
+#define SEQ_HDK 4
+static uint8_t* g_seqHd; static int g_seqHdM7;
 // A tile's 8x8 source from the VRAM words at `base` (depth 2, 4 or 8 bits, the SNES's planar layout), one draw a cell.
 static uint32_t seqTileTag(const CtSeqPic* p, uint32_t key, unsigned base, int depth, int flags, int tx, int ty) {
   int inst = CtSrcCellFind(key);
@@ -299,6 +307,11 @@ static void m7Start(const CtSeqPic* p, Line* L, int y) {
 static int m7Pixel(const CtSeqPic* p, const Line* L, int x, int layer, int pri) {
   int rx = L->m7xflip ? 255 - x : x;
   int xp = (L->m7sx + p->m7[0] * rx) >> 8, yp = (L->m7sy + p->m7[2] * rx) >> 8;
+  if (L->hdOn) {                                                       // (a sub-sample: the plane between two pixels)
+    int dx = L->m7xflip ? -L->hdI : L->hdI, dy = L->m7yflip ? -L->hdJ : L->hdJ;
+    xp = (L->m7sx + p->m7[0] * rx + ((p->m7[0] * dx + p->m7[1] * dy) >> 2)) >> 8;
+    yp = (L->m7sy + p->m7[2] * rx + ((p->m7[2] * dx + p->m7[3] * dy) >> 2)) >> 8;
+  }
   int out = xp < 0 || xp >= 1024 || yp < 0 || yp >= 1024;
   xp &= 0x3FF; yp &= 0x3FF;
   if (!L->m7large) out = 0;
@@ -358,6 +371,24 @@ static void drawLine(CtSeqPic* p, Line* L, int line, uint8_t* out) {
   sprites(p, L, line - 1);
   if (L->mode == 7) m7Start(p, L, line);
   for (int x = 0; x < 256; x++) shade(p, L, x, line, out + x * 3);
+  if (g_seqHd && line >= 1 && line <= 224) {                           // (the HD presenter's 4x drawing, above)
+    const int W = 256 * SEQ_HDK;
+    for (int j = 0; j < SEQ_HDK; j++) {
+      uint8_t* hrow = g_seqHd + ((size_t)(line - 1) * SEQ_HDK + j) * W * 3;
+      for (int x = 0; x < 256; x++) {
+        const uint8_t* o1 = out + x * 3;
+        const int m7 = L->mode == 7 && !L->blank && !(L->mosaicOn[0] && L->mosaic > 1);
+        for (int i = 0; i < SEQ_HDK; i++) {
+          uint8_t* o = hrow + ((size_t)x * SEQ_HDK + i) * 3;
+          if (!m7 || (i == 0 && j == 0)) { memcpy(o, o1, 3); continue; }
+          L->hdOn = 1; L->hdI = i; L->hdJ = j;
+          shade(p, L, x, line, o);
+          L->hdOn = 0;
+        }
+      }
+    }
+    if (L->mode == 7 && !L->blank) g_seqHdM7 = 1;
+  }
   if (g_seqPicWideSide > 0 && g_seqPicWideOut && line >= 1 && line <= 224) {   // the widescreen's sides (a mod)
     uint8_t* row = g_seqPicWideOut + (size_t)(line - 1) * (256 + 2 * g_seqPicWideSide) * 3;
     for (int c = 0; c < g_seqPicWideSide; c++) {
@@ -391,7 +422,7 @@ static void shade(CtSeqPic* p, Line* L, int x, int line, uint8_t* o) {
     o[1] = (uint8_t)(((g << 3) | (g >> 2)) * L->bright / 15);
     o[2] = (uint8_t)(((b << 3) | (b >> 2)) * L->bright / 15);
   }
-  if (g_seqRecPic && x >= 0 && x < 256) CtSrcPutTag(g_seqRecPic, 256, x, line - 1, tag, o[0], o[1], o[2]);
+  if (g_seqRecPic && !L->hdOn && x >= 0 && x < 256) CtSrcPutTag(g_seqRecPic, 256, x, line - 1, tag, o[0], o[1], o[2]);
 }
 
 // ---- HDMA: the hardware's walk over the stage's tables (the init at the frame's start, a transfer at each line's end) ----
@@ -454,10 +485,14 @@ void CtSeqPicFrame(CtSeqPic* p, const CtSeqPicHdma ch[8], uint8_t en, CtSeqPicRe
   p->rangeOver = p->timeOver = 0;                                      // (and the sprite flags cleared: ppu.c handleFrameStart)
   if (rd) { hdmaInit(ch, en, w, rd, ctx); hdmaRun(p, ch, en, w, rd, ctx, 0); }
   g_seqRecPic = g_ctSrcOn && rgb ? rgb : NULL;                         // (the HD presenter's records: hdsrc.h)
+  L.hdOn = 0; g_seqHdM7 = 0;
+  if (g_seqRecPic && !g_seqHd) g_seqHd = (uint8_t*)malloc((size_t)256 * SEQ_HDK * 224 * SEQ_HDK * 3);
+  if (!g_seqRecPic && g_seqHd) { uint8_t* keep = g_seqHd; g_seqHd = NULL; free(keep); }
   for (int line = 1; line <= 224; line++) {
     drawLine(p, &L, line, rgb ? rgb + (size_t)(line - 1) * 256 * 3 : scratch);
     if (rd) hdmaRun(p, ch, en, w, rd, ctx, line);
   }
+  if (g_seqRecPic && g_seqHd && g_seqHdM7) CtSrcNative(rgb, 256, g_seqHd, SEQ_HDK);   // (a mode-7 frame: its own 4x drawing)
   if (!(p->r[0x00] & 0x80)) { p->oamAdr = p->oamAdrWritten; p->oamInHigh = p->oamInHighWritten; p->oamSecond = 0; }   // the vblank
 }
 

@@ -2625,7 +2625,22 @@ machine lacks the file (a state another machine makes), and adds no uncatalogued
 
 The records' contract for a picture assembled from another (the 16:9 battle's and sequence's, `CtSrcShows`): it takes no
 write of its own -- `CtSrcNone`, `CtSrcNoneRect`, `CtSrcBlend`, a copy with nothing to copy -- and reads the other's record
-through it at its column. The mutations drop each write's guard (the alias has no arrays: a crash).
+through it at its column. The mutations drop each write's guard (the alias has no arrays: a crash). And a picture's own 4x
+drawing (`CtSrcNative`, a mode-7 plane's) read through two views, the columns added, gone with the frame.
+
+### hd-presenter-records-hold-in-16-9 (`Belthasar --scene 433`, `CT_SETTINGS=tools/settings/wide_16_9_hd.ini`)
+
+The attract's first 2600 frames in the player's presentation at 16:9 with the HD presenter (the options file's; a
+`CT_BUGKEYS` event far past the run is what makes the headless run interactive): every recorded texel names the index its
+drawer drew. In 16:9 the world is composed twice a frame -- the wide picture from the camera's tilemap view, the 256 view
+from the world's stream -- and their cells have keys of their own (Zeal's clouds named another tile when they shared).
+
+### hd-presenter-draws-mode-7-at-4x (`Belthasar --scene 8 ... --selftest --frames 3644`, `CT_HD_PRESENTER=1`)
+
+The Telepod's gate warp (a mode-7 plane through per-line matrices) with the HD presenter on: every pixel of its frames
+drawn from HD art -- the sequences' PPU model draws each mode-7 line again at 4x (`seq_pic.c`), and the presenter uses
+that drawing for a pixel no record names. `hd-pictures:` pins what was drawn; the mutations draw the plane at its pixels,
+ignore the 4x drawing, or copy the warp's frame without it.
 
 ### hd-presenter-in-16-9-through-a-fight (`python tools/hd_independence.py session --headless --backend sdl --legs 13`)
 

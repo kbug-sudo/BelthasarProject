@@ -35,9 +35,14 @@ int CtSrcCount(void);                                 // the pool's size (ids 1.
 
 // ---- instances (this frame's draws) ----
 int CtSrcGroup(void);                                 // a new group (the draws of one object)
-// A draw of `src` (flags 1 = x flip, 2 = y flip) in `group` (0 = a group of its own), its box's top-left at (x0, y0) of
-// the picture it is drawn into (informative: a presenter that places objects, the 2.5D one): its id >= 1 (0 = off).
+// A draw of `src` (flags 1 = x flip, 2 = y flip, CT_SRC_CRISP) in `group` (0 = a group of its own), its box's top-left at
+// (x0, y0) of the picture it is drawn into (informative: a presenter that places objects, the 2.5D one): its id >= 1
+// (0 = off).
 int CtSrcDraw(int src, int flags, int group, int x0, int y0);
+// CRISP: text -- the dialogue's, the menus' and the battle's glyphs, the damage digits. The presenter draws such a pixel as
+// it is, k x k (nearest-neighbour, whole multiples), never through upscaled art: the automatic pass (and an AI upscale)
+// blurs a glyph's strokes (the owner, 2026-10-26). A redrawn font replaces this with its own art (M8).
+#define CT_SRC_CRISP 4
 typedef struct CtSrcInst { int src, group; int16_t x0, y0; uint8_t flags; uint16_t has; uint8_t col[16][3]; } CtSrcInst;
 const CtSrcInst* CtSrcInstOf(int inst);               // NULL = none
 int CtSrcInstCount(void);
@@ -62,10 +67,17 @@ void CtSrcBlend(const uint8_t* pic, int w, int x, int y);
 void CtSrcCopyRow(const uint8_t* dst, int dw, int dx, int dy, const uint8_t* src, int sw, int sx, int sy, int n);
 // Picture `pic` (w wide) shows picture `view` (vw wide) from its column x0: its records are the view's, moved.
 void CtSrcShows(const uint8_t* pic, int w, const uint8_t* view, int vw, int x0);
+// Picture `pic` (w wide) was also drawn at k x by its own drawer into `hd` ((w * k) x (224 * k) RGB, valid to the frame's
+// end): a pixel without a record is that drawing's k x k block, not the frame's pixel k x k -- what no tile names, a mode-7
+// plane, drawn at the presenter's resolution (seq_pic.c). Read through a picture that shows it (CtSrcShows).
+void CtSrcNative(const uint8_t* pic, int w, const uint8_t* hd, int k);
 // A picture's records: per pixel a tag (CtSrcTag; 0 = no source), the instance count when it was written (paint order:
-// a draw with a later id is in front of it) and the colour written. For a picture that shows a view, the view's at x0.
-typedef struct CtSrcPlane { int w, vw, x0; const uint32_t* tag; const uint32_t* seq; const uint8_t* rgb; const uint8_t* blend; } CtSrcPlane;
-int CtSrcPlaneOf(const uint8_t* pic, int w, CtSrcPlane* out);   // 0 = nothing recorded
+// a draw with a later id is in front of it) and the colour written. For a picture that shows a view, the view's at x0
+// (a view that shows another, that one's: the columns add up). tag NULL = no records, only its native drawing
+// (`native`, nk x: CtSrcNative; NULL = none).
+typedef struct CtSrcPlane { int w, vw, x0; const uint32_t* tag; const uint32_t* seq; const uint8_t* rgb; const uint8_t* blend;
+                            const uint8_t* native; int nk; } CtSrcPlane;
+int CtSrcPlaneOf(const uint8_t* pic, int w, CtSrcPlane* out);   // 0 = nothing recorded and no native drawing
 static inline long CtSrcAt(const CtSrcPlane* P, int x, int y) {  // the record of pixel (x, y) of the picture, -1 = none
   int vx = x - P->x0;
   return (unsigned)vx < (unsigned)P->vw && (unsigned)y < 224u ? (long)y * P->vw + vx : -1;

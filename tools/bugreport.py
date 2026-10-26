@@ -566,7 +566,8 @@ def check_pad():
     try:
         _, dlv, ded, _ = read_log(DRIVE)
         # the drive on the pad: the host's own recording must be the drive itself, and the game the drive's game
-        ds = pad_session(tmp, 'pad', {'CT_BUGREPORT_AT': '4700:picture:the pad\'s report'}, 1)
+        # (with a decoy controller attached first, as a player's real pad left plugged in: the probe's is the one read)
+        ds = pad_session(tmp, 'pad', {'CT_BUGREPORT_AT': '4700:picture:the pad\'s report', 'CT_BUGPAD_DECOY': '1'}, 1)
         if len(ds) != 1:
             print('bugreport-check: FAIL the pad session wrote %d report(s)' % len(ds))
             return 1

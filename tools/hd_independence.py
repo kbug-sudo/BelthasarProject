@@ -184,7 +184,7 @@ def session(fullscreen, backend, hd_dir, headless=False, legs=None, presenter='h
         # (through route legs the session is ~29k frames drawn at 4x: well past 900 s while a whole suite runs beside it)
         r = br.run([pt.FIELD, '--assets', 'ct_assets.dat', '--boot'], env, timeout=900 if legs is None else 3600)
         for l in (r.stdout + r.stderr).splitlines():
-            if l.startswith(('bugreport-pad:', '[video]', 'hd-coverage:', 'srccheck:', 'bugreport: saved')):
+            if l.startswith(('bugreport-pad:', '[video]', 'hd-coverage:', 'srccheck:', 'hd-pictures:', 'bugreport: saved')):
                 print('hd-session: ' + l)
         ds = br.report_dirs(os.path.join(tmp, 'bugs'))
         ok = len(ds) == 1

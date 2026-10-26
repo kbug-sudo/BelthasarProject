@@ -1,3 +1,5 @@
 # The bug reporter's drive logs are pinned by their bytes (tools/regress_inputs.json; regress.py normalises line endings
 # only for its text extensions): LF in every checkout, whatever core.autocrlf says.
 tools/bugreport/*.log text eol=lf
+# The checks' options files are pinned by their bytes as well (regress.py normalises only its text extensions)
+tools/settings/*.ini text eol=lf

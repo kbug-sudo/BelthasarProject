@@ -1864,9 +1864,11 @@ static void worldComposeMap(World* w, uint8_t* fb) {
   g_owObsel = keep;
 }
 // The HD presenter's record of a world BG pixel (hdsrc.h): tile cell (col, row) of BG `bg` -- its VRAM character, 4bpp,
-// one draw a cell a frame -- at texel (tx, ty) (the flips applied: the character's own pixel).
-static uint32_t owSrcTag(const World* w, int bg, int col, int row, uint16_t chip, int tx, int ty, int x, int y) {
-  uint32_t key = CT_SRC_KEY(9 + bg, (row << 6) | col);
+// one draw a cell a frame -- at texel (tx, ty) (the flips applied: the character's own pixel). `site` names the tilemap
+// the cell is read from: the world's own stream (9 + bg) or the widescreen's view of it (12 + bg) -- both are composed in
+// one frame, and the same cell of the two may hold another tile.
+static uint32_t owSrcTag(const World* w, int site, int col, int row, uint16_t chip, int tx, int ty, int x, int y) {
+  uint32_t key = CT_SRC_KEY(site, (row << 6) | col);
   int inst = CtSrcCellFind(key);
   if (!inst) {
     int t = chip & 0x3FF;
@@ -1918,6 +1920,7 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
   const int subOwn = w->wram && ((w->wram[0x0042] & 0x13) != (tmain & 0x13)) && mathBg3 && !mathFix;   // owComposeSub
   const int mz = owMosaicSize(w->wram), mo3 = owMosaicOn(w->wram, 2);
   if (subOwn) owComposeSub(w, stm, cs, hdmaEn, W, X0);
+  const int owSite = stm == &w->stm ? 9 : 12;      // (the HD presenter's records: which tilemap a cell is read from)
   for (int y = 0; y < CAMH; y++) {
     uint8_t* dst = fb + (size_t)y * W * 3;
     uint16_t bg2hL = cs->bg2h, bg2vL = cs->bg2v;                 // BG2's scroll on this line: HDMA's when a channel feeds it
@@ -1946,9 +1949,9 @@ static void worldComposeAt(World* w, uint8_t* fb, int W, int X0, const CtWorldSt
                                (((w->vram[bi + 16] >> k) & 1) << 2) | (((w->vram[bi + 17] >> k) & 1) << 3));
         if (!v4) continue;
         bgCover[y * W + x] |= (uint8_t)((chip & 0x2000) ? (1 << bg) : (4 << bg));
-        if (chip & 0x2000) { if (p1 < 0) { p1 = pb + v4; p1bg = bg; if (g_ctSrcOn) sTag1 = owSrcTag(w, bg, col, row, chip, tx, ty, x, y); }   // priority-1 = foreground
+        if (chip & 0x2000) { if (p1 < 0) { p1 = pb + v4; p1bg = bg; if (g_ctSrcOn) sTag1 = owSrcTag(w, owSite + bg, col, row, chip, tx, ty, x, y); }   // priority-1 = foreground
                              if (bg == 0 && p1bg1 < 0) { p1bg1 = pb + v4; if (g_ctSrcOn) fgTag[y * W + x] = sTag1; } }
-        else if (p0 < 0) { p0 = pb + v4; p0bg = bg; if (g_ctSrcOn) sTag0 = owSrcTag(w, bg, col, row, chip, tx, ty, x, y); }   // priority-0 = background
+        else if (p0 < 0) { p0 = pb + v4; p0bg = bg; if (g_ctSrcOn) sTag0 = owSrcTag(w, owSite + bg, col, row, chip, tx, ty, x, y); }   // priority-0 = background
       }
       // WHAT OCCLUDES THE PLAYER: only BG1's priority-1 pixels. The PPU's mode-1 stack, front to back, is
       // OBJ3 / BG1p1 / OBJ2 / BG2p1 / OBJ1 / BG1p0 / OBJ0 / BG2p0, and the lead is an OBJ of priority 2
@@ -3318,7 +3321,7 @@ static int glyphDraw(const uint8_t* g, int x, int y) {
     int p0 = g[ry * 4] | (g[ry * 4 + 1] << 8), p1 = g[ry * 4 + 2] | (g[ry * 4 + 3] << 8);
     for (int rx = 0; rx < 12; rx++) idx[ry * 12 + rx] = (uint8_t)(((p0 >> (11 - rx)) & 1) | (((p1 >> (11 - rx)) & 1) << 1));
   }
-  return CtSrcDraw(CtSrcOf(idx, 12, 12), 0, 0, x, y);
+  return CtSrcDraw(CtSrcOf(idx, 12, 12), CT_SRC_CRISP, 0, x, y);   // (text: crisp)
 }
 static int cDrawGlyphP(uint8_t* fb, const uint8_t* font, int gi, int x, int y, const uint8_t tone[4][3]) {
   if (gi < 0) return 5;
@@ -3997,7 +4000,7 @@ static int asciiToCt(char a);   // fwd: ASCII -> CT char code (defined below, vi
 static void drawFontGlyphP(const uint8_t* font, uint8_t* fb, int code, int x, int y, const uint8_t pal[4][3]) {
   if (!font) return;
   const uint8_t* g = font + (code & 0xFF) * 16;
-  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf2bpp(g), 0, 0, x, y) : 0;   // (the HD presenter's record of the glyph)
+  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf2bpp(g), CT_SRC_CRISP, 0, x, y) : 0;   // (the HD presenter's record of the glyph: crisp)
   for (int yy = 0; yy < 8; yy++) {
     int b0 = g[yy * 2], b1 = g[yy * 2 + 1];
     for (int xx = 0; xx < 8; xx++) {
@@ -7315,7 +7318,7 @@ static void battleHudRenderStrip(uint8_t* fb, const uint8_t* mem, const uint8_t*
       if (g_ctSrcOn) {                                 // (the HD presenter's record: the cell's glyph)
         uint32_t key = CT_SRC_KEY(2, (bottom << 16) | (row << 8) | (bx >> 3));
         int inst = CtSrcCellFind(key);
-        if (!inst) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf2bpp(g), ((w & 0x4000) ? 1 : 0) | ((w & 0x8000) ? 2 : 0), 0,
+        if (!inst) inst = CtSrcCellPut(key, CtSrcDraw(CtSrcOf2bpp(g), ((w & 0x4000) ? 1 : 0) | ((w & 0x8000) ? 2 : 0) | CT_SRC_CRISP, 0,
                                                      x - (bx & 7), y - fine));
         g_srcTag = CtSrcTag(inst, 7 - bit, fy);
         if (g_ctSrcCheck) CtSrcExpect(g_srcTag, v);
@@ -9210,7 +9213,7 @@ static void battleMarleAttackRender(uint8_t* fb, const uint8_t* mem, const CtBat
 // One 8x8 4bpp OBJ tile blit at (x,y), palette = ctBattleFxDigitPal (OBJ pal0, shared by the damage digits
 // AND the "MISS" glyph -- both are pal0, battle_actionfx.md P1.1 / battle_miss_evade.md §2). idx 0 = clear.
 static void battleFxBlitTile(uint8_t* fb, const uint8_t* t, int x, int y, const uint16_t* pal) {
-  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf4bpp(t), 0, 0, x, y) : 0;   // (the HD presenter's record)
+  const int sInst = g_ctSrcOn ? CtSrcDraw(CtSrcOf4bpp(t), CT_SRC_CRISP, 0, x, y) : 0;   // (the HD presenter's record: digits, crisp)
   for (int yy = 0; yy < 8; yy++) {
     int b0 = t[yy * 2], b1 = t[yy * 2 + 1], b2 = t[16 + yy * 2], b3 = t[16 + yy * 2 + 1];
     for (int xx = 0; xx < 8; xx++) {
@@ -12171,13 +12174,19 @@ int main(int argc, char** argv) {
       vd.version = SDL_VIRTUAL_JOYSTICK_DESC_VERSION; vd.type = SDL_JOYSTICK_TYPE_GAMECONTROLLER;
       vd.naxes = SDL_CONTROLLER_AXIS_MAX; vd.nbuttons = SDL_CONTROLLER_BUTTON_MAX; vd.name = "bugreport probe";
       vd.button_mask = (1u << SDL_CONTROLLER_BUTTON_MAX) - 1; vd.axis_mask = (1u << SDL_CONTROLLER_AXIS_MAX) - 1;
+      // CT_BUGPAD_DECOY=1 (test): another controller attached first -- a player's real pad left plugged in, which SDL
+      // lists before the probe's: the probe's own controller must still be the one opened
+      if (getenv("CT_BUGPAD_DECOY")) { SDL_VirtualJoystickDesc dd = vd; dd.name = "a decoy controller"; SDL_JoystickAttachVirtualEx(&dd); }
       int vi = SDL_JoystickAttachVirtualEx(&vd);
       if (vi < 0 || !(g_bugPad = SDL_JoystickOpen(vi)) || !CtBugPlayOpen(bp, err, sizeof err)) {
         printf("bugreport-pad: FAIL %s\n", vi < 0 || !g_bugPad ? SDL_GetError() : err); fflush(stdout); return 2; }
+      g_pad = SDL_GameControllerOpen(vi);              // (the probe's: whatever else is plugged in -- fieldPadOpen keeps it)
+      CtOverlaySetPadName(g_pad ? SDL_GameControllerName(g_pad) : NULL);
     }
 #endif
     fieldPadOpen();
-    if (g_bugPad) printf("bugreport-pad: a virtual controller, %s, %s\n", SDL_IsGameController(0) ? "a game controller" : "NOT a game controller",
+    if (g_bugPad) printf("bugreport-pad: a virtual controller, %s, %s\n",
+                         g_pad && SDL_GameControllerGetJoystick(g_pad) == g_bugPad ? "a game controller" : "NOT the controller opened",
                          g_pad ? SDL_GameControllerName(g_pad) : "not opened");
   }
   int audioOn = (SDL_InitSubSystem(SDL_INIT_AUDIO) == 0);
@@ -21324,6 +21333,8 @@ int main(int argc, char** argv) {
       // translated stage's bus).
       if (gwNState == 0) gwNState = CtGwarpFrame(gwN, g_gwWram, &g_stagePic, g_gwPic);
       memcpy(fb, g_gwPic, sizeof g_gwPic);
+      CtSrcShows(fb, CAMW, g_gwPic, CAMW, 0);          // (the HD presenter: the frame is the warp's picture, its records and
+                                                       //  its mode-7 plane's own 4x drawing with it)
     }
     g_memmonStage = gwN ? g_gwWram : NULL;
     // ...but only once the sequence is OPEN. Op 0xFF < $90 first runs its own fade inside the field's program (C0/3FBB-3FD1,

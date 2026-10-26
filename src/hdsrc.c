@@ -109,7 +109,8 @@ int CtSrcInstCount(void) { return g_ninst; }
 #define NPIC 8
 #define PH 224
 typedef struct { const uint8_t* pic; int w, used; uint32_t* tag; uint32_t* seq; uint8_t* rgb; uint8_t* blend;
-                 const uint8_t* view; int vw, x0; } Pic;        // view: this picture shows that one from column x0
+                 const uint8_t* view; int vw, x0;              // view: this picture shows that one from column x0
+                 const uint8_t* native; int nk; } Pic;         // native: its drawer's own k x drawing (CtSrcNative)
 static Pic g_pics[NPIC];
 static long long g_frames, g_tagged, g_untagged;   // (64 bits: a long run passes 2^31 pixels)
 static int alloc1(Pic* p, int w) {
@@ -212,13 +213,28 @@ void CtSrcShows(const uint8_t* pic, int w, const uint8_t* view, int vw, int x0) 
   }
   p->view = view; p->vw = vw; p->x0 = x0;
 }
+void CtSrcNative(const uint8_t* pic, int w, const uint8_t* hd, int k) {
+  if (!g_ctSrcOn || !pic || !hd || k < 1) return;
+  Pic* p = find(pic);
+  if (!p) {
+    for (int i = 0; i < NPIC && !p; i++) if (!g_pics[i].pic) p = &g_pics[i];
+    if (!p) return;
+    p->pic = pic; p->w = w; p->tag = NULL; p->seq = NULL; p->rgb = NULL; p->blend = NULL;
+  }
+  if (p->w != w) return;                           // (another width: its records are another picture's)
+  p->native = hd; p->nk = k;
+}
 int CtSrcPlaneOf(const uint8_t* pic, int w, CtSrcPlane* o) {
   if (!g_ctSrcOn || !o) return 0;
   Pic* p = find(pic);
   int x0 = 0;
-  if (p && p->view) { x0 = p->x0; p = find(p->view); }
-  if (!p || !p->used || !p->tag) return 0;
-  o->w = w; o->vw = p->w; o->x0 = x0; o->tag = p->tag; o->seq = p->seq; o->rgb = p->rgb; o->blend = p->blend;
+  for (int hop = 0; p && p->view && hop < 4; hop++) { x0 += p->x0; p = find(p->view); }   // (a view of a view: the columns add)
+  if (!p) return 0;
+  const int recs = p->used && p->tag;
+  if (!recs && !p->native) return 0;
+  o->w = w; o->vw = p->w; o->x0 = x0;
+  o->tag = recs ? p->tag : NULL; o->seq = recs ? p->seq : NULL; o->rgb = recs ? p->rgb : NULL; o->blend = recs ? p->blend : NULL;
+  o->native = p->native; o->nk = p->native ? p->nk : 0;
   return 1;
 }
 void CtSrcFrame(void) {
@@ -226,7 +242,7 @@ void CtSrcFrame(void) {
   g_frames++;
   for (int i = 0; i < NPIC; i++) {
     Pic* p = &g_pics[i];
-    p->view = NULL;
+    p->view = NULL; p->native = NULL; p->nk = 0;
     if (p->pic && p->used && p->tag) {
       memset(p->tag, 0, (size_t)p->w * PH * 4);
       memset(p->seq, 0, (size_t)p->w * PH * 4);
@@ -252,11 +268,21 @@ int CtSrcSelfTest(void) {
   long q = -1;
   int through = CtSrcPlaneOf(pic, 16, &P) && (q = CtSrcAt(&P, 5, 1)) >= 0 && P.tag[q] == CtSrcTag(inst, 1, 1) &&
                 CtSrcAt(&P, 1, 1) < 0 && CtSrcAt(&P, 12, 1) < 0;
+  // a native drawing (CtSrcNative) read through two aliases: top shows pic from 2, pic shows view from 4 -- view's 4x
+  // drawing at top's column 2 + 4 + 1 is view's column 1
+  static uint8_t top[20 * PH * 3], hd[8 * 4 * PH * 4 * 3];
   CtSrcFrame();
+  CtSrcShows(top, 20, pic, 16, 2); CtSrcShows(pic, 16, view, 8, 4);
+  CtSrcNative(view, 8, hd, 4);
+  int nat = CtSrcPlaneOf(top, 20, &P) && P.native == hd && P.nk == 4 && !P.tag && P.x0 == 6 && CtSrcAt(&P, 7, 3) == 3 * 8 + 1;
+  CtSrcFrame();
+  nat = nat && !CtSrcPlaneOf(view, 8, &P);         // (and gone with the frame: the drawn picture itself has none left)
   g_ctSrcOn = was;
-  printf("hdsrctest: %s -- writes to a picture that shows another: %s; the other's record read through it: %s\n",
-         quiet && through ? "PASS" : "FAIL", quiet ? "none taken" : "TAKEN", through ? "at its column" : "WRONG");
-  return quiet && through;
+  printf("hdsrctest: %s -- writes to a picture that shows another: %s; the other's record read through it: %s; "
+         "a native 4x drawing read through two: %s\n",
+         quiet && through && nat ? "PASS" : "FAIL", quiet ? "none taken" : "TAKEN", through ? "at its column" : "WRONG",
+         nat ? "at its column, gone with the frame" : "WRONG");
+  return quiet && through && nat;
 }
 void CtSrcStats(long long* frames, long long* tagged, long long* untagged) {
   if (frames) *frames = g_frames; if (tagged) *tagged = g_tagged; if (untagged) *untagged = g_untagged;
@@ -267,7 +293,19 @@ void CtSrcExpect(uint32_t tag, int v) {
   const CtSrcInst* e = CtSrcInstOf((int)(tag >> 8));
   CtSrcInfo si;
   int tx = (int)(tag & 15), ty = (int)((tag >> 4) & 15);
-  if (!e || !CtSrcInfoOf(e->src, &si) || tx >= si.w || ty >= si.h || si.idx[ty * si.w + tx] != v) g_chkBad++;
+  if (!e || !CtSrcInfoOf(e->src, &si) || tx >= si.w || ty >= si.h || si.idx[ty * si.w + tx] != v) {
+    g_chkBad++;
+    // CT_SRCCHECK=2 (debug): the first 24 that name another index -- the draw's box, size and flags, the texel, both indices
+    static int level = -1, said = 0;
+    if (level < 0) { const char* c = getenv("CT_SRCCHECK"); level = c ? atoi(c) : 0; }
+    if (level >= 2 && said < 24) {
+      said++;
+      printf("srccheck-miss: frame %lld inst %d src %dx%d at (%d,%d) flags %d group %d texel (%d,%d): drawn %d, the source has %d\n",
+             g_frames, (int)(tag >> 8), e && CtSrcInfoOf(e->src, &si) ? si.w : -1, e ? si.h : -1, e ? e->x0 : 0, e ? e->y0 : 0,
+             e ? e->flags : 0, e ? e->group : 0, tx, ty, v,
+             e && tx < si.w && ty < si.h ? si.idx[ty * si.w + tx] : -1);
+    }
+  }
 }
 void CtSrcExpectTrue(int ok) { g_chk++; if (!ok) g_chkBad++; }
 void CtSrcCheckStats(long long* checked, long long* wrong) { if (checked) *checked = g_chk; if (wrong) *wrong = g_chkBad; }

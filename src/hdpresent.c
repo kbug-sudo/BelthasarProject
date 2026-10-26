@@ -330,16 +330,17 @@ static int fieldRasterHD(const CtMotFrame* cur, const CtMotFrame* prev, const ui
   // transparent subpixels left to what is under it, its opaque ones in the colour the cell wrote for that index -- and
   // rounds into its cell's own transparent texels next to it, unless its own sprite painted those (the cells overlap);
   // a pixel without one is its colour, k x k
-  static uint8_t* sp; static uint8_t* spf; static uint8_t* spp; static int* grp; static size_t spN;
+  static uint8_t* sp; static uint8_t* spf; static uint8_t* spp; static int* grp; static uint8_t* hole1; static size_t spN;
   if (spN < (size_t)W * H) {
-    free(sp); free(spf); free(spp); free(grp);
+    free(sp); free(spf); free(spp); free(grp); free(hole1);
     sp = (uint8_t*)malloc((size_t)W * H * 3); spf = (uint8_t*)malloc((size_t)W * H); spp = (uint8_t*)malloc((size_t)W * H);
-    grp = (int*)malloc((size_t)CT_MOT_W * 224 * sizeof(int));
-    spN = (sp && spf && spp && grp) ? (size_t)W * H : 0;
+    grp = (int*)malloc((size_t)CT_MOT_W * 224 * sizeof(int)); hole1 = (uint8_t*)malloc((size_t)CT_MOT_W * 224);
+    spN = (sp && spf && spp && grp && hole1) ? (size_t)W * H : 0;
   }
   if (!spN) return 0;
   memset(spf, 0, (size_t)W * H);
   memset(grp, 0, (size_t)w * 224 * sizeof(int));     // (per 1x pixel: the group of the sprite that painted it last)
+  memset(hole1, 0, (size_t)w * 224);                 // (...and whether it was an occluder's hole: the map's HD shows)
   for (int n = 0; n < cur->nspx; n++) {
     int own = cur->spx[n].own, o = own & 0x7F;
     int X0 = cur->spx[n].x * k + sx[o], Y0 = cur->spx[n].y * k + sy[o];
@@ -351,6 +352,7 @@ static int fieldRasterHD(const CtMotFrame* cur, const CtMotFrame* prev, const ui
     CtSrcInfo si; const uint8_t* art = NULL;
     if (e && CtSrcInfoOf(e->src, &si)) art = CtHdArt(e->src);
     const int tx = (int)(tag & 15), ty = (int)((tag >> 4) & 15);
+    if (in1) hole1[py1 * w + px1] = (uint8_t)(f == 0);
     if (!art || tx >= si.w || ty >= si.h) {
       for (int j = 0; j < k; j++) {
         int Y = Y0 + j; if ((unsigned)Y >= (unsigned)H) continue;
@@ -445,7 +447,8 @@ static int fieldRasterHD(const CtMotFrame* cur, const CtMotFrame* prev, const ui
         if (!(f[0] | f[1] | f[2])) continue;
         int own = cur->own[y * w + x];
         tot++;
-        int h1 = own == CT_MOT_FIXED ? (fixHdP && fixOn[y * w + x]) : (own & 0x7F) >= CT_MOT_SPR ? grp[y * w + x] != 0 : 1;
+        int h1 = own == CT_MOT_FIXED ? (fixHdP && fixOn[y * w + x]) :
+                 (own & 0x7F) >= CT_MOT_SPR ? grp[y * w + x] != 0 || hole1[y * w + x] : 1;
         hd += h1;
         if (w <= CT_MOT_W) g_covMask[y * w + x] = (uint8_t)(h1 ? 1 : 2);
       }
@@ -563,7 +566,7 @@ static void scaled(const uint8_t* c, const Transfer* t, uint8_t* o) {
 typedef struct { const CtSrcInst* e; CtSrcInfo s; const uint8_t* art; int tx, ty, inst; Transfer tr; } Rec;
 static int recOf(const CtSrcPlane* P, const uint8_t* fb, int w, int x, int y, Rec* r) {
   long q = CtSrcAt(P, x, y);
-  if (q < 0) return 0;
+  if (q < 0 || !P->tag) return 0;
   uint32_t t = P->tag[q];
   if (!t) return 0;
   r->inst = (int)(t >> 8); r->tx = (int)(t & 15); r->ty = (int)((t >> 4) & 15);
@@ -577,15 +580,23 @@ static inline int artAt(const Rec* r, int tx, int ty, int i, int j) {   // the H
   int hx = tx * HDK + ((r->e->flags & 1) ? HDK - 1 - i : i), hy = ty * HDK + ((r->e->flags & 2) ? HDK - 1 - j : j);
   return r->art[(size_t)hy * r->s.w * HDK + hx];
 }
-static inline uint32_t instAt(const CtSrcPlane* P, int x, int y) { long q = CtSrcAt(P, x, y); return q < 0 ? 0 : P->tag[q] >> 8; }
+static inline uint32_t instAt(const CtSrcPlane* P, int x, int y) { long q = CtSrcAt(P, x, y); return q < 0 || !P->tag ? 0 : P->tag[q] >> 8; }
 int CtHdSrcBlock(const CtSrcPlane* P, const uint8_t* fb, int w, int x, int y, uint8_t out[HDK * HDK][3]) {
   const uint8_t* f0 = fb + ((size_t)y * w + x) * 3;
   for (int k = 0; k < HDK * HDK; k++) memcpy(out[k], f0, 3);
   const long q = CtSrcAt(P, x, y);
   if (q < 0) return 0;
+  // no record, but the picture's own drawer drew it at the presenter's scale (CtSrcNative: a mode-7 plane): its block
+  if (P->native && P->nk == HDK && (!P->tag || !P->tag[q])) {
+    const int vx = x - P->x0, NW = P->vw * HDK;
+    for (int j = 0; j < HDK; j++)
+      for (int i = 0; i < HDK; i++) memcpy(out[j * HDK + i], P->native + ((size_t)(y * HDK + j) * NW + (size_t)vx * HDK + i) * 3, 3);
+    return 1;
+  }
   int any = 0;
   Rec r;
   const int have = recOf(P, fb, w, x, y, &r);
+  if (have && (r.e->flags & CT_SRC_CRISP)) return 1;  // (text: the pixel as it is, HDK x HDK -- out holds it already)
   if (have) {
     const int v = r.s.idx[r.ty * r.s.w + r.tx];
     for (int j = 0; j < HDK; j++)
@@ -608,6 +619,7 @@ int CtHdSrcBlock(const CtSrcPlane* P, const uint8_t* fb, int w, int x, int y, ui
   }
   // GROWTH: an instance drawn after this pixel's content, whose box holds this pixel as one of its transparent texels,
   // puts down the HD art's opaque subpixels here (the art rounds a corner into it) -- never one of its own group's
+  if (!P->tag) return have;
   const uint32_t seq = P->seq[q];
   const int ownGroup = have ? r.e->group : 0;
   Rec g; int gx = 0, gy = 0, best = 0;
@@ -619,7 +631,7 @@ int CtHdSrcBlock(const CtSrcPlane* P, const uint8_t* fb, int w, int x, int y, ui
       uint32_t ni = instAt(P, nx, ny);
       if (!ni || (int)ni <= best || ni <= seq) continue;
       Rec n;
-      if (!recOf(P, fb, w, nx, ny, &n) || (ownGroup && n.e->group == ownGroup)) continue;
+      if (!recOf(P, fb, w, nx, ny, &n) || (ownGroup && n.e->group == ownGroup) || (n.e->flags & CT_SRC_CRISP)) continue;
       int ox = n.tx + ((n.e->flags & 1) ? dx : -dx), oy = n.ty + ((n.e->flags & 2) ? dy : -dy);   // (this pixel in it)
       if (ox < 0 || oy < 0 || ox >= n.s.w || oy >= n.s.h || n.s.idx[oy * n.s.w + ox]) continue;
       g = n; gx = ox; gy = oy; best = n.inst;
