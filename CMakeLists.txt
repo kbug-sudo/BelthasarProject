@@ -178,8 +178,10 @@ if(CT_SDL_INC)
     target_compile_definitions(Belthasar PRIVATE CT_DATAFREE)
   endif()
   if(MSVC)
-    # the host's pictures at the options (the title's mode 7 at the internal resolution): drawn on every core
-    set_source_files_properties(src/title_intro.c src/fieldnative.c src/field.c src/hdpresent.c PROPERTIES COMPILE_OPTIONS "/openmp")
+    # the host's pictures at the options (the title's mode 7 at the internal resolution, a stage's mode 7 at the HD
+    # presenter's 4x): drawn on every core
+    set_source_files_properties(src/title_intro.c src/fieldnative.c src/field.c src/hdpresent.c src/seq_pic.c
+                                PROPERTIES COMPILE_OPTIONS "/openmp")
     target_compile_definitions(Belthasar PRIVATE _CRT_SECURE_NO_WARNINGS)
     target_compile_options(Belthasar PRIVATE /W2 /wd4244 /wd4267 /wd4018 /wd4146 /wd4334 /wd4101)
     if(DEFINED ENV{CT_ASAN})

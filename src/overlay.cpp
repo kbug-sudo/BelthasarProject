@@ -188,8 +188,8 @@ extern "C" int CtOverlayFrame(void) {
       if (ImGui::IsItemHovered())
         ImGui::SetTooltip("In a narrow room as wide as its own map (the sky of the fight with Flea, GATO's room, the Telepod)\n"
                           "the sides show the map wrapping round, as the camera would see it -- sometimes repeating what\n"
-                          "is in the middle. Off: black past the room's edges. A room inside a larger map (Crono's\n"
-                          "house) is always black past its edge: other rooms are there.");
+                          "is in the middle. Off: black past the room's edges, its sky or backdrop layer too. A room inside\n"
+                          "a larger map (Crono's house) is always black past its edge: other rooms are there.");
       bool ip = s->interpolate != 0;
       if (ImGui::Checkbox("Frames between (60+ fps)", &ip)) s->interpolate = ip;
       if (ImGui::IsItemHovered())

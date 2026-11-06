@@ -42,6 +42,29 @@ static void setEnv(const char* key, const char* value, int overwrite) {
 #endif
 }
 
+// A 4K screen at 200%: an unaware process is drawn at 1920x1080 and doubled by Windows -- the picture softened, the HD
+// presenter's art with it. Aware, the picture is placed in the drawable's own pixels (present.c CtPresentOutputSize) and a
+// window's size from the options is taken times the display's scale (field.c hostWindowSize).
+int CtLauncherDpiAware(void) {
+#ifdef _WIN32
+  typedef BOOL (WINAPI *SetCtx)(HANDLE);
+  typedef HANDLE (WINAPI *GetCtx)(void);
+  typedef int (WINAPI *AwarenessOf)(HANDLE);
+  HMODULE u = GetModuleHandleW(L"user32.dll");
+  if (!u) return 0;
+  if (!getenv("CT_DPI_UNAWARE")) {
+    SetCtx set = (SetCtx)(void*)GetProcAddress(u, "SetProcessDpiAwarenessContext");
+    if (!set || !set((HANDLE)(intptr_t)-4)) SetProcessDPIAware();   // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, else the system's
+  }
+  GetCtx get = (GetCtx)(void*)GetProcAddress(u, "GetThreadDpiAwarenessContext");
+  AwarenessOf of = (AwarenessOf)(void*)GetProcAddress(u, "GetAwarenessFromDpiAwarenessContext");
+  if (get && of) { int a = of(get()); return a < 0 ? 0 : a; }
+  return IsProcessDPIAware() ? 1 : 0;
+#else
+  return 0;
+#endif
+}
+
 // ct_assets.dat, and the dump only when the container is not a ROM-free one (docs/ROM.md: a ROM-free container is all
 // the engine reads; the dump is the setup's input).
 static int romFreeAssets(const char* dir) {

@@ -4,6 +4,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 // The layer order of each mode, front to back (0-3 the BGs, 4 the OBJ, 5 none), with the priority each entry takes; 8 is mode
 // 1 with BG3's priority bit ($2105 bit 3), 9 mode 7 with EXTBG ($2133 bit 6). The bit depth of each BG by mode (5 = none).
@@ -111,6 +114,20 @@ static uint8_t* g_seqRecPic; static uint32_t g_seqTag;
 // pixels 4x4. A mode-7 plane has no tiles a record could name: this is its HD picture. Nothing of the game reads it.
 #define SEQ_HDK 4
 static uint8_t* g_seqHd; static int g_seqHdM7;
+// CT_HD_STATS: the mode-7 lines drawn at 4x, how many of them were spread over the cores, and the team (drawLine; the
+// team is the host's, field.c main)
+static long g_seqHdLines, g_seqHdSpread;
+static void seqHdStatsAtExit(void) {
+  int team = 1, cap = 1;                             // (the cap's size: OMP_NUM_THREADS, else 4 or the processors when fewer)
+#ifdef _OPENMP
+  team = omp_get_max_threads();
+  { const char* e = getenv("OMP_NUM_THREADS"); int n = omp_get_num_procs();
+    cap = e && atoi(e) > 0 ? atoi(e) : n < 4 ? (n < 1 ? 1 : n) : 4; }
+#endif
+  printf("hd-mode7: %ld mode-7 lines drawn at 4x, %ld of them spread over the host's team (", g_seqHdLines, g_seqHdSpread);
+  if (team == cap) printf("the cap's size)\n"); else printf("%d threads, not the cap's %d)\n", team, cap);
+  fflush(stdout);
+}
 // A tile's 8x8 source from the VRAM words at `base` (depth 2, 4 or 8 bits, the SNES's planar layout), one draw a cell.
 static uint32_t seqTileTag(const CtSeqPic* p, uint32_t key, unsigned base, int depth, int flags, int tx, int ty) {
   int inst = CtSrcCellFind(key);
@@ -254,7 +271,8 @@ static int bgPixel(const CtSeqPic* p, const Line* L, int x, int y, int layer, in
   int depth = kDepth[L->mode][layer];
   if (L->mode == 0) pal += 8 * layer;
   unsigned base = (unsigned)L->chr[layer] + (unsigned)((tn & 0x3FF) * 4 * depth);
-  if (g_seqRecPic)                                                     // (the HD presenter's record of the cell, if it wins)
+  if (g_seqRecPic && !L->hdOn)                                         // (the HD presenter's record of the cell, if it wins;
+                                                                       //  a 4x sub-sample records nothing: drawLine)
     g_seqTag = seqTileTag(p, CT_SRC_KEY(26 + layer, (ta & 0x7FFF) << 2 | (wideT && (x & 8) ? 1 : 0) | (L->big[layer] && (y & 8) ? 2 : 0)),
                           base, depth, ((tile & 0x4000) ? 1 : 0) | ((tile & 0x8000) ? 2 : 0), 7 - col, row);
   uint16_t a = p->vram[(base + row) & 0x7FFF];
@@ -267,7 +285,7 @@ static int bgPixel(const CtSeqPic* p, const Line* L, int x, int y, int layer, in
     size = 256; uint16_t c = p->vram[(base + 16 + row) & 0x7FFF], d = p->vram[(base + 24 + row) & 0x7FFF];
     v |= (((c >> col) & 1) << 4) | (((c >> (8 + col)) & 1) << 5) | (((d >> col) & 1) << 6) | (((d >> (8 + col)) & 1) << 7);
   }
-  if (g_seqRecPic && g_ctSrcCheck && v) CtSrcExpect(g_seqTag, v);   // (the record names the index drawn: CT_SRCCHECK)
+  if (g_seqRecPic && !L->hdOn && g_ctSrcCheck && v) CtSrcExpect(g_seqTag, v);   // (the record names the index drawn: CT_SRCCHECK)
   return v ? size * pal + v : 0;
 }
 
@@ -330,7 +348,7 @@ static int pixel(const CtSeqPic* p, const Line* L, int x, int y, int sub, int* r
     int on = sub ? L->sub[cl] && (!L->subWin[cl] || !winState(p, L, cl, x))
                  : L->main[cl] && (!L->mainWin[cl] || !winState(p, L, cl, x));
     if (!on) continue;
-    if (!sub) g_seqTag = 0;
+    if (!sub && !L->hdOn) g_seqTag = 0;                                // (a 4x sub-sample records nothing: drawLine)
     if (cl < 4) {
       int lx = x, ly = y;
       if (L->mosaicOn[cl] && L->mosaic > 1) { lx -= lx % L->mosaic; ly -= (ly - p->mosaicStart) % L->mosaic; }
@@ -346,11 +364,11 @@ static int pixel(const CtSeqPic* p, const Line* L, int x, int y, int sub, int* r
       int ox = x;                                                      //  the sub screen's texture repeated 256 along)
       if ((x < 0 || x > 255) && sub && !L->main[4]) ox = x & 255;
       px = (ox >= 0 && ox < 256 && L->objPri[ox] == cp) ? L->objPix[ox] : 0;
-      if (px && !sub && g_seqRecPic) g_seqTag = L->objTag[ox];
+      if (px && !sub && g_seqRecPic && !L->hdOn) g_seqTag = L->objTag[ox];
     }
     if (px > 0) { layer = cl; break; }
   }
-  if (!sub && (layer == 5 || L->mode == 7 || (L->direct && layer < 4 && kDepth[L->actMode][layer] == 8))) g_seqTag = 0;
+  if (!sub && !L->hdOn && (layer == 5 || L->mode == 7 || (L->direct && layer < 4 && kDepth[L->actMode][layer] == 8))) g_seqTag = 0;
   if (L->direct && layer < 4 && kDepth[L->actMode][layer] == 8) {
     *rr = ((px & 7) << 2) | ((px & 0x100) >> 7); *gg = ((px & 0x38) >> 1) | ((px & 0x200) >> 8); *bb = ((px & 0xC0) >> 3) | ((px & 0x400) >> 8);
   } else {
@@ -371,25 +389,58 @@ static void drawLine(CtSeqPic* p, Line* L, int line, uint8_t* out) {
   sprites(p, L, line - 1);
   if (L->mode == 7) m7Start(p, L, line);
   for (int x = 0; x < 256; x++) shade(p, L, x, line, out + x * 3);
+  int sidesDrawn = 0;
   if (g_seqHd && line >= 1 && line <= 224) {                           // (the HD presenter's 4x drawing, above)
     const int W = 256 * SEQ_HDK;
-    for (int j = 0; j < SEQ_HDK; j++) {
-      uint8_t* hrow = g_seqHd + ((size_t)(line - 1) * SEQ_HDK + j) * W * 3;
-      for (int x = 0; x < 256; x++) {
-        const uint8_t* o1 = out + x * 3;
-        const int m7 = L->mode == 7 && !L->blank && !(L->mosaicOn[0] && L->mosaic > 1);
-        for (int i = 0; i < SEQ_HDK; i++) {
-          uint8_t* o = hrow + ((size_t)x * SEQ_HDK + i) * 3;
-          if (!m7 || (i == 0 && j == 0)) { memcpy(o, o1, 3); continue; }
-          L->hdOn = 1; L->hdI = i; L->hdJ = j;
-          shade(p, L, x, line, o);
-          L->hdOn = 0;
+    const int m7 = L->mode == 7 && !L->blank && !(L->mosaicOn[0] && L->mosaic > 1);
+    if (!m7) {                                                         // (no mode-7 plane: the line's own pixels 4x4)
+      for (int j = 0; j < SEQ_HDK; j++) {
+        uint8_t* hrow = g_seqHd + ((size_t)(line - 1) * SEQ_HDK + j) * W * 3;
+        for (int x = 0; x < 256; x++)
+          for (int i = 0; i < SEQ_HDK; i++) memcpy(hrow + ((size_t)x * SEQ_HDK + i) * 3, out + x * 3, 3);
+      }
+    } else {
+      // A mode-7 line's 15 sub-samples a pixel (its own pixel the 16th), SPREAD OVER THE HOST'S TEAM (field.c main), the
+      // widescreen's sides with them: one column's 4x4 block (or one side pixel) is that column's alone, every sample
+      // shaded through the thread's own copy of the line (shade() is handed the sub-sample in it) and recording nothing
+      // shared (pixel(): no g_seqTag while hdOn). A side pixel is sample (0, 0) -- the plane at the pixel itself, as the
+      // sides' own pass reads it (m7Pixel adds nothing) -- and outside the 256 nothing is recorded anyway. The same pixels
+      // as one core drew them: the race's road is mode 7 on every line, 15 x 256 x 224 shades a frame -- ~24 ms on one.
+      const int side = g_seqPicWideSide > 0 && g_seqPicWideOut ? g_seqPicWideSide : 0;
+      uint8_t* srow = side ? g_seqPicWideOut + (size_t)(line - 1) * (256 + 2 * side) * 3 : NULL;
+      int x, spread = 0;
+      #pragma omp parallel
+      {
+        Line T = *L;
+        T.hdOn = 1;
+#ifdef _OPENMP
+        #pragma omp single nowait
+        spread = omp_get_num_threads() > 1;
+#endif
+        #pragma omp for schedule(dynamic, 8)
+        for (x = -side; x < 256 + side; x++) {
+          if (x < 0 || x >= 256) {                                     // a side's pixel
+            T.hdI = 0; T.hdJ = 0;
+            shade(p, &T, x, line, srow + (size_t)(x + side) * 3);
+            continue;
+          }
+          const uint8_t* o1 = out + x * 3;
+          for (int j = 0; j < SEQ_HDK; j++) {
+            uint8_t* o = g_seqHd + (((size_t)(line - 1) * SEQ_HDK + j) * W + (size_t)x * SEQ_HDK) * 3;
+            for (int i = 0; i < SEQ_HDK; i++, o += 3) {
+              if (i == 0 && j == 0) { memcpy(o, o1, 3); continue; }
+              T.hdI = i; T.hdJ = j;
+              shade(p, &T, x, line, o);
+            }
+          }
         }
       }
+      g_seqHdLines++; g_seqHdSpread += spread;
+      sidesDrawn = 1;
     }
     if (L->mode == 7 && !L->blank) g_seqHdM7 = 1;
   }
-  if (g_seqPicWideSide > 0 && g_seqPicWideOut && line >= 1 && line <= 224) {   // the widescreen's sides (a mod)
+  if (!sidesDrawn && g_seqPicWideSide > 0 && g_seqPicWideOut && line >= 1 && line <= 224) {   // the widescreen's sides (a mod)
     uint8_t* row = g_seqPicWideOut + (size_t)(line - 1) * (256 + 2 * g_seqPicWideSide) * 3;
     for (int c = 0; c < g_seqPicWideSide; c++) {
       shade(p, L, c - g_seqPicWideSide, line, row + c * 3);
@@ -486,7 +537,11 @@ void CtSeqPicFrame(CtSeqPic* p, const CtSeqPicHdma ch[8], uint8_t en, CtSeqPicRe
   if (rd) { hdmaInit(ch, en, w, rd, ctx); hdmaRun(p, ch, en, w, rd, ctx, 0); }
   g_seqRecPic = g_ctSrcOn && rgb ? rgb : NULL;                         // (the HD presenter's records: hdsrc.h)
   L.hdOn = 0; g_seqHdM7 = 0;
-  if (g_seqRecPic && !g_seqHd) g_seqHd = (uint8_t*)malloc((size_t)256 * SEQ_HDK * 224 * SEQ_HDK * 3);
+  if (g_seqRecPic && !g_seqHd) {
+    g_seqHd = (uint8_t*)malloc((size_t)256 * SEQ_HDK * 224 * SEQ_HDK * 3);
+    static int stats;
+    if (!stats && getenv("CT_HD_STATS")) { stats = 1; atexit(seqHdStatsAtExit); }
+  }
   if (!g_seqRecPic && g_seqHd) { uint8_t* keep = g_seqHd; g_seqHd = NULL; free(keep); }
   for (int line = 1; line <= 224; line++) {
     drawLine(p, &L, line, rgb ? rgb + (size_t)(line - 1) * 256 * 3 : scratch);

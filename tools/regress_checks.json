@@ -45525,6 +45525,92 @@
       ]
     },
     {
+      "name": "wide-narrow-room-black-past-its-edge-with-the-wrap-off",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/wide_sides_cmp.py",
+        "5600,5800,6000,6200"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "wide-sides: f5600 wrap 1: 29962 of 31808 side pixels lit",
+        "wide-sides: f5800 wrap 1: 29962 of 31808 side pixels lit",
+        "wide-sides: f6000 wrap 1: 29962 of 31808 side pixels lit",
+        "wide-sides: f6200 wrap 1: 29962 of 31808 side pixels lit",
+        "wide-sides: f5600 wrap 0: 0 of 31808 side pixels lit",
+        "wide-sides: f5800 wrap 0: 0 of 31808 side pixels lit",
+        "wide-sides: f6000 wrap 0: 0 of 31808 side pixels lit",
+        "wide-sides: f6200 wrap 0: 0 of 31808 side pixels lit"
+      ],
+      "pin": [
+        "^wide-sides: "
+      ],
+      "timeout_s": 300,
+      "note_pass": "the attract's Magus's castle under the moon (loc 0A5, a room as wide as its own map) at 16:9: with the wrap on its sides show the map going round and its clouds; with the wrap off they are black, its sky too",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "      if (wm0 > -(1 << 29) && f.sd && !fieldWideBlack(&f, wideW) &&",
+          "replace": "      if (wm0 > -(1 << 29) && f.sd &&   /* MUT */",
+          "why": "with the wrap off the room's self-scrolling clouds go on past its edge: the sides repeat the sky"
+        },
+        {
+          "file": "src/field.c",
+          "find": "  return roomW == f->W && roomW < w && !CtSettingsGet()->wideRoomWrap;",
+          "replace": "  return roomW < f->W && roomW < w && !CtSettingsGet()->wideRoomWrap;   /* MUT */",
+          "why": "the rule picks the rooms inside a larger map instead of the rooms as wide as their map: 0A5's clouds go on past its edge again"
+        }
+      ],
+      "notes": "THE WIDESCREEN'S SIDES PAST A NARROW ROOM, WITH THE WRAP OFF (a mod; src/field.c fieldWideBlack). The owner, 2026-11-06: in 16:9 Magus's castle 'doubles the side rather than just showing black bars'. The F1 option 'Narrow rooms: continue the map at the sides' (settings wide_room_wrap) promised 'Off: black past the room's edges', but a room's self-scrolling layer (fieldBeyondPixel: the sky, stars, clouds that scroll on their own) went on past the edge even then -- in a room as wide as its whole map it only repeats what the screen shows. Now, with the wrap off, such a room's sides are black whole (the field's picture, the native and HD drawers through motLayers' `beyond`, and a fight's sides); a room inside a larger map keeps its self-scrolling layers past its edge, and the wrap on is unchanged. tools/wide_sides_cmp.py runs the attract at 16:9 with the wrap on and off (the overlay probe makes the host interactive) and counts the lit side pixels on four frames of 0A5. Re-pin only for an intended change of the widescreen's sides."
+    },
+    {
+      "name": "host-window-at-the-display-scale",
+      "tier": "quick",
+      "argv": [
+        "build/Belthasar.exe",
+        "--assets",
+        "ct_assets.dat",
+        "--scene",
+        "433"
+      ],
+      "env": {
+        "SDL_VIDEODRIVER": "dummy",
+        "SDL_AUDIODRIVER": "dummy",
+        "CT_NOAUDIO": "1",
+        "CT_NOPACE": "1",
+        "CT_DISPLAY_SCALE": "2",
+        "CT_SETTINGS": "build/_dpi_defaults_absent.ini",
+        "CT_OVERLAY_SHOT": "build/_dpi_window.bmp@60:9"
+      },
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc"
+      ],
+      "expect": [
+        "[video] SDL_Renderer (software); window 1024x896 at display scale 2.00",
+        "overlay-shot: f60 tab 9 -> build/_dpi_window.bmp (1024x896)"
+      ],
+      "pin": [
+        "^overlay-shot: "
+      ],
+      "timeout_s": 60,
+      "note_pass": "the options' window (2x, the defaults) taken times the display's scale (2 here, as on a 4K screen at 200%): 1024x896 of the display's own pixels",
+      "mutations": [
+        {
+          "file": "src/field.c",
+          "find": "  double s = hostDisplayScale(win);",
+          "replace": "  double s = 1.0; (void)win;   /* MUT */",
+          "why": "the window at the options' size in the display's pixels: half as large as before on a 4K screen at 200%"
+        }
+      ],
+      "notes": "THE SCREEN'S OWN PIXELS (Windows; src/launcher.c CtLauncherDpiAware, src/field.c hostDisplayScale / hostWindowSize). The owner's 4K screen runs at 200%: the game, DPI-unaware, was drawn at 1920x1080 and doubled by Windows -- the HD presenter's art softened (seen 2026-11-06). The process is now per-monitor DPI-aware before the video starts (CT_DPI_UNAWARE=1 keeps the old way); the picture was already placed in the drawable's own pixels (present.c CtPresentOutputSize, every backend) and the options' font follows the drawable's height (overlay.cpp), so only a window's size from the options changes: it is taken times the display's scale (SDL_GetDisplayDPI / 96), and looks as large as before. The dummy video driver has no display: CT_DISPLAY_SCALE stands in for its scale, and the overlay probe (CT_OVERLAY_SHOT) makes the host interactive -- the only kind that sizes the window from the options. The settings file named does not exist: the defaults (window_scale 2). Re-pin only for an intended change of the window's size or the [video] line. The awareness itself (Windows only: the [video] line's last words) is not pinned, so the check reads the same off Windows; it was seen on the owner's 4K screen (2026-11-06: the picture 3840x2160, the options window the same size as before)."
+    },
+    {
       "name": "field-dragon-tank-bridge-vs-rule-cartridge",
       "tier": "full",
       "argv": [
@@ -47130,7 +47216,7 @@
         "Chrono_Trigger_USA_SNES.sfc"
       ],
       "expect": [
-        "snd-machine: quick: 413 runs (58 with sound), PCM identical in 413 / 413 (27246282 samples), stdout identical in 413 / 413"
+        "snd-machine: quick: 414 runs (58 with sound), PCM identical in 414 / 414 (27246282 samples), stdout identical in 414 / 414"
       ],
       "pin": [
         "^snd-machine: "
@@ -47368,7 +47454,7 @@
         "tools/third_party_saves.json"
       ],
       "expect": [
-        "input-provenance: 632 check(s) read 247 state file(s): 236 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
+        "input-provenance: 633 check(s) read 247 state file(s): 236 made by recipes, 11 third-party, 0 private capture(s) read by 0 check(s); 0 unclassified, 0 stale"
       ],
       "pin": [
         "^input-provenance: \\d+ check"
@@ -48405,6 +48491,62 @@
           "why": "the warp's frame is copied without its records and its 4x drawing"
         }
       ]
+    },
+    {
+      "name": "hd-presenter-race-mode-7-spread-over-the-team",
+      "tier": "full",
+      "argv": [
+        "python",
+        "tools/race_hd_cmp.py"
+      ],
+      "env": {},
+      "inputs": [
+        "ct_assets.dat",
+        "Chrono_Trigger_USA_SNES.sfc",
+        "saves/race_re/race_user.lakewram",
+        "saves/race_re/race_user.state"
+      ],
+      "expect": [
+        "race-hd: widescreen 16:9, 700 frames",
+        "hd-mode7: 93240 mode-7 lines drawn at 4x, 93240 of them spread over the host's team (the cap's size)",
+        "hd-pictures: 628 pictures drawn, fnv 4BCA0A9B7EDC7530",
+        "race-hd: widescreen off, 700 frames",
+        "hd-pictures: 701 pictures drawn, fnv A89C1A970825CB0D"
+      ],
+      "pin": [
+        "^race-hd: ",
+        "^hd-mode7: ",
+        "^hd-pictures: "
+      ],
+      "timeout_s": 300,
+      "note_pass": "the story race at the HD presenter, in 16:9 and with the widescreen off: every mode-7 line's 4x samples (and the widescreen's sides) drawn by the host's capped thread team -- the same pictures, hash for hash, as one core drew them before",
+      "mutations": [
+        {
+          "file": "src/seq_pic.c",
+          "find": "      #pragma omp parallel",
+          "replace": "      /* MUT: no team */",
+          "why": "the HD presenter's mode 7 drawn on one core: 0 lines spread (the race ran at half speed in HD)"
+        },
+        {
+          "file": "src/field.c",
+          "find": "omp_set_num_threads(n < 4 ? (n < 1 ? 1 : n) : 4);",
+          "replace": "(void)n;   /* MUT */",
+          "why": "a team as wide as the machine: its spinning threads cost the frame more than they draw (graded on a machine of more than 4 processors: elsewhere the cap is the machine)"
+        },
+        {
+          "file": "src/seq_pic.c",
+          "find": "              T.hdI = i; T.hdJ = j;",
+          "replace": "              T.hdI = 0; T.hdJ = 0;   /* MUT */",
+          "why": "every sub-sample reads the pixel's own texel: the road at the SNES's pixels, 4x4"
+        },
+        {
+          "file": "src/seq_pic.c",
+          "find": "            shade(p, &T, x, line, srow + (size_t)(x + side) * 3);",
+          "replace": "            T.hdI = 2; shade(p, &T, x, line, srow + (size_t)(x + side) * 3);   /* MUT */",
+          "why": "a widescreen side's pixel is the plane at the pixel itself (sample 0, 0), as the sides' own pass read it"
+        }
+      ],
+      "notes": "THE HD PRESENTER'S MODE 7, SPREAD OVER THE HOST'S TEAM (a mod; src/seq_pic.c drawLine, src/field.c main). The owner, 2026-11-06: 'that bike race part seems to suffer in frame rate'. Measured in the player's presentation on a 24-core i9-13900KF (32 threads): the race's picture cost 24-27 ms a frame at the HD presenter (2.2 ms without) -- its road is mode 7 on every line and each of its pixels was shaded 16 times on one core -- so the race ran at about half speed in HD, 16:9 or not. The 15 sub-samples a pixel (and the widescreen's sides of a mode-7 line) are now handed to the host's thread team line by line, each thread shading through its own copy of the line and recording nothing shared; and the host's team is 4 threads (OMP_NUM_THREADS when set), not one a core: a team as wide as the machine spins between the passes on the cores the frame's own work needs and waits for its slowest core (the race in HD 16:9: 17.5 ms a frame with 32 threads, 13.0 with 4; the attract in HD 16:9: 100 late frames with 32, none with 4). After: the race 11.4 ms a frame in HD 16:9, 8.6 with the widescreen off, 3 and 2 late frames a run (the race's opening and end). The pinned hashes are the code before the change's (built from d664984): the same pixels. The line says whether the team is the cap's size (4, or the processors when fewer; the tool unsets OMP_NUM_THREADS), not the machine's count, so it reads the same on any machine. Seeded by the recipe lg_race_lab32 (tools/fixtures/lategame.json); tools/race_hd_cmp.py makes the host interactive with the overlay probe (CT_OVERLAY_SHOT, the only kind of run that reads the widescreen). Re-pin the hashes only for an intended change of the HD presenter's mode 7 or of the race's picture."
     },
     {
       "name": "hd-presenter-records-hold-in-16-9",

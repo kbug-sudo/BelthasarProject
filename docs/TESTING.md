@@ -2677,11 +2677,45 @@ drawn from HD art -- the sequences' PPU model draws each mode-7 line again at 4x
 that drawing for a pixel no record names. `hd-pictures:` pins what was drawn; the mutations draw the plane at its pixels,
 ignore the 4x drawing, or copy the warp's frame without it.
 
+### hd-presenter-race-mode-7-spread-over-the-team (`python tools/race_hd_cmp.py`)
+
+Lab 32's race (recipe `lg_race_lab32`) at the HD presenter, in the player's presentation (the overlay probe makes the
+host interactive, so the widescreen is read): 700 frames at 16:9, then 700 with the widescreen off. The race's road is
+mode 7 on every line, and its 4x drawing (15 sub-samples a pixel) cost 24-27 ms a frame on one core: the race ran at
+about half speed in HD. `seq_pic.c` now hands each mode-7 line's sub-samples -- and the widescreen's sides of that line
+-- to the host's thread team, and the host's team is 4 threads (`field.c` main; `OMP_NUM_THREADS` when set): a team as
+wide as the machine spun between the passes and cost more than it drew. `hd-mode7:` pins the lines drawn, that every
+one was spread over the host's team, and that the team is the cap's size (4, or the processors when fewer; the tool
+unsets `OMP_NUM_THREADS`), so it reads the same on any machine; `hd-pictures:` pins both
+runs' hashes, which are the code before the change's -- the same pixels. The mutations draw on one core, drop the team's
+cap, read every sub-sample at the pixel, and sample a side off its pixel. Re-pin the hashes only for an intended change
+of the HD presenter's mode 7 or of the race's picture.
+
 ### hd-presenter-in-16-9-through-a-fight (`python tools/hd_independence.py session --headless --backend sdl --legs 13`)
 
 The player's presentation at 16:9 from power-on through the canyon's first fight and out of it, on the virtual
 controller: the report taken after the fight replays with every mod off, its work RAM identical. (Its picture differs:
 the bug reporter crops the 16:9 window's native picture, the vanilla presenter too -- not graded here.)
+
+### wide-narrow-room-black-past-its-edge-with-the-wrap-off (`python tools/wide_sides_cmp.py 5600,5800,6000,6200`)
+
+The attract at 16:9, twice -- the F1 option "Narrow rooms: continue the map at the sides" (`wide_room_wrap`) on, then
+off -- counting the lit pixels outside the middle 256 columns on four frames of Magus's castle under the moon (0A5, a
+room as wide as its own map, with clouds that scroll on their own). With the wrap on the sides show the map going round
+and its clouds (29962 of 31808 lit); with it off they are black whole (0), its sky too: before, the self-scrolling
+clouds went on past the edge (`fieldBeyondPixel`) and repeated what the screen shows. `field.c fieldWideBlack`; the
+mutations put the sky back past the edge, or make the rule pick the rooms inside a larger map instead. (The option's own
+term in `fieldWideBlack` is not mutated: with the wrap on, `fieldWideMask` leaves such a room no edge, so the rule is
+never asked.) Re-pin only for an intended change of the widescreen's sides.
+
+### host-window-at-the-display-scale (`Belthasar --scene 433`, `CT_DISPLAY_SCALE=2`, `CT_OVERLAY_SHOT=...@60:9`)
+
+The screen's own pixels on Windows: the process is per-monitor DPI-aware (before, a 4K screen at 200% got the game drawn
+at 1920x1080 and doubled by Windows), and a window's size from the options is taken times the display's scale so it
+looks as large as before. Headless (the dummy driver has no display) with the scale given as 2 and the options' defaults
+(window_scale 2): the `[video]` line pins the window, 1024x896; the overlay probe's picture is that size. The mutation
+sizes the window without the scale. The awareness itself (Windows only, the `[video]` line's last words) is not pinned,
+so the check reads the same off Windows; it was seen on the owner's 4K screen (the picture 3840x2160).
 
 ### hd-presenter-turns-off-and-on (`Belthasar --scene 433 --frames 5000 --selftest`, `CT_HD_PRESENTER=2500-4000`)
 

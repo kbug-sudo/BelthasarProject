@@ -16,6 +16,11 @@ extern "C" {
 // 2 = the player closed the ROM screen.
 int CtLauncherConfigure(int* argc, char*** argv);
 
+// THE SCREEN'S OWN PIXELS (Windows; main(), before the video starts): the process made per-monitor DPI-aware, so the
+// host draws at the display's resolution instead of Windows scaling its window up afterwards -- unless CT_DPI_UNAWARE is
+// set. Returns the awareness in force: 2 per monitor, 1 the system's, 0 none (0 elsewhere than Windows).
+int CtLauncherDpiAware(void);
+
 // --- for the ROM screen ---
 typedef struct CtLauncher {
   char data[1024];          // the data folder (ends with a separator)

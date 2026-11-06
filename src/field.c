@@ -116,6 +116,9 @@
 #include "ct_owobj.h"    // the overworld ambient-object block ABI (offsets shared with world.c)
 #include "tables/ow_era_placard.h"   // the ERA PLACARD, captured per era id from the oracle OBJ layer
 #include "ct_owobj.h"        // the overworld object block layout (the placard is one of those objects)
+#ifdef _OPENMP
+#include <omp.h>             // the host's thread team (main)
+#endif
 
 #define CAMW 256
 #define CAMH 224
@@ -257,15 +260,35 @@ static void hostDrawPicture(CtPresenter* pr) {
       if (SDL_TICKS_PASSED(SDL_GetTicks(), g_bugToastUntil)) g_bugToastUntil = 0; else CtOverlayToast(g_bugToast); } }
   else CtPresentDraw(pr, NULL, 0);
 }
-// The window's size for the options: the picture at `windowScale` (4:3 widens it).
-static void hostWindowSize(int* w, int* h) {
+// THE DISPLAY'S SCALE (Windows, the process per-monitor DPI-aware: launcher.h CtLauncherDpiAware, main): the window and
+// the picture are in the display's own pixels, so a window's size from the options is taken times the scale the player set
+// for its display (200% on a 4K screen) and looks as large as it did when Windows scaled an unaware window up -- the
+// picture now drawn at the screen's resolution. 1 elsewhere, or unaware. CT_DISPLAY_SCALE=<s> (probe) stands in for the
+// display's (the dummy video driver has none).
+static int g_hostDpiAware;
+static double hostDisplayScale(SDL_Window* win) {
+  const char* e = getenv("CT_DISPLAY_SCALE");
+  if (e && atof(e) > 0) return atof(e);
+#ifdef _WIN32
+  if (g_hostDpiAware >= 1) {
+    int d = win ? SDL_GetWindowDisplayIndex(win) : 0; float hdpi = 0;
+    if (SDL_GetDisplayDPI(d < 0 ? 0 : d, NULL, &hdpi, NULL) == 0 && hdpi > 0) return hdpi / 96.0;
+  }
+#else
+  (void)win;
+#endif
+  return 1.0;
+}
+// The window's size for the options: the picture at `windowScale` (4:3 widens it), times the display's scale.
+static void hostWindowSize(SDL_Window* win, int* w, int* h) {
   const CtSettings* st = CtSettingsGet();
   { const char* ws = getenv("CT_WINDOW");            // CT_WINDOW=<w>x<h> (probe): the window's size, the options' aside
     int pw = 0, ph = 0;
     if (ws && sscanf(ws, "%dx%d", &pw, &ph) == 2 && pw > 0 && ph > 0) { *w = pw; *h = ph; return; } }
   int k = st->windowScale < 1 ? 1 : st->windowScale;
-  *h = CAMH * k;
-  *w = (int)(hostWideW() * k * (st->aspect == CT_ASPECT_4_3 ? 7.0 / 6.0 : 1.0) + 0.5);
+  double s = hostDisplayScale(win);
+  *h = (int)(CAMH * k * s + 0.5);
+  *w = (int)(hostWideW() * k * (st->aspect == CT_ASPECT_4_3 ? 7.0 / 6.0 : 1.0) * s + 0.5);
 }
 // Apply the picture options to a live window (the overlay changed them).
 static void hostApplyVideo(CtPresenter* pr) {
@@ -279,7 +302,7 @@ static void hostApplyVideo(CtPresenter* pr) {
   int fsNow = (SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP;
   if (st->fullscreen != fsNow) SDL_SetWindowFullscreen(win, st->fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
   if (!st->fullscreen) {
-    int w, h, cw, ch; hostWindowSize(&w, &h); SDL_GetWindowSize(win, &cw, &ch);
+    int w, h, cw, ch; hostWindowSize(win, &w, &h); SDL_GetWindowSize(win, &cw, &ch);
     static int lastScale = -1, lastAspect = -1, lastWide = -1;
     if (lastScale != st->windowScale || lastAspect != st->aspect || lastWide != st->widescreen) {   // only when the size
       if (lastScale >= 0 && (cw != w || ch != h)) SDL_SetWindowSize(win, w, h);   // options changed: a window the player
@@ -4915,6 +4938,15 @@ static void fieldWideMask(const Field* f, int w, int* x0, int* x1) {
   int roomW = f->mx1 - f->mx0;
   if (roomW > f->W || (roomW == f->W && roomW < w && CtSettingsGet()->wideRoomWrap)) { *x0 = -(1 << 30); *x1 = 1 << 30; }
   else { *x0 = f->mx0; *x1 = f->mx1; }
+}
+// A ROOM THAT WOULD WRAP, WITH THE WRAP OFF (settings.h wideRoomWrap, "Off: black past the room's edges"): a room as wide as
+// its whole map and narrower than the picture has nothing past its edge but itself -- its self-scrolling layers too only
+// repeat what the screen shows there (Magus's castle under the moon, 0A5: its clouds went on past the edge, "it doubles
+// the side rather than just showing black bars", the owner 2026-11-06). Its sides are black whole: no fieldBeyondPixel.
+// A room inside a larger map keeps its self-scrolling layers past its edge (1B0's lava under the Epoch).
+static int fieldWideBlack(const Field* f, int w) {
+  int roomW = f->mx1 - f->mx0;
+  return roomW == f->W && roomW < w && !CtSettingsGet()->wideRoomWrap;
 }
 // PAST A ROOM'S EDGE (the widescreen, where fieldWideMask keeps the edge): the map there holds other rooms -- but a layer
 // that scrolls on its own, detached from the map (BG2 / BG3 with an offset: 1B0's lava under the Epoch, 0AD's stars), is a
@@ -10703,6 +10735,16 @@ int main(int argc, char** argv) {
     if (launcherStatus) return launcherStatus == 2 ? 0 : launcherStatus; }
 #endif
   dbgInit();                                     // cache the debug env flags (hot loops read dbg.*)
+#ifdef _OPENMP
+  // THE HOST'S THREAD TEAM: the pictures drawn on several cores (title_intro.c, fieldnative.c, hdpresent.c, seq_pic.c)
+  // share one team of a few threads, not one a core. Their passes are short and many -- seq_pic.c hands the HD presenter's
+  // mode 7 out again on each line -- and a team as wide as the machine costs the frame more than it draws: its idle
+  // threads spin between the passes on the cores the frame's own work runs on, and a pass waits for its slowest core
+  // (measured on a 24-core i9-13900KF, 32 threads; the Lab 32 race at the HD presenter in 16:9: 17.5 ms a frame with 32
+  // threads, 15.5 with 16, 13.6 with 8, 13.0 with 4; the attract in HD 16:9, 100 late frames with 32, none with 4).
+  // OMP_NUM_THREADS, when set, is the team (the render-independence run's 1).
+  if (!getenv("OMP_NUM_THREADS")) { int n = omp_get_num_procs(); omp_set_num_threads(n < 4 ? (n < 1 ? 1 : n) : 4); }
+#endif
 #ifdef CT_DATAFREE
   // A DATA-FREE build holds the generated tables as zeroed storage: fill them from the pack made from the player's
   // ROM before anything reads one (src/datapack.h, docs/ROM.md). A pack that does not match this build is refused.
@@ -12231,6 +12273,9 @@ int main(int argc, char** argv) {
     fieldFree(&f); CtAssetsClose(&assets); return 0;
   }
   if (selftest) SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+#ifdef _WIN32
+  g_hostDpiAware = CtLauncherDpiAware();               // (before the video starts: the screen's own pixels, launcher.h)
+#endif
   SDL_SetMainReady();
   // AUDIO is optional at every level: SDL_INIT_AUDIO may fail (headless CI runs with
   // SDL_VIDEODRIVER=dummy and often no audio device at all), the ROM may be absent, and the $C7
@@ -12412,7 +12457,7 @@ int main(int argc, char** argv) {
   pc.software = !g_hostInteractive && (selftest || g_noPace); pc.logical = !g_hostInteractive; pc.vsync = 1; pc.sdlDriver = "";
   if (g_hostInteractive) {
     const CtSettings* st = CtSettingsGet();
-    hostWindowSize(&pc.w, &pc.h);
+    hostWindowSize(NULL, &pc.w, &pc.h);
     pc.fullscreen = st->fullscreen; pc.backend = st->backend; pc.sdlDriver = st->renderDriver; pc.vsync = st->vsync;
     pc.hidden = getenv("CT_OVERLAY_SHOT") || getenv("CT_BUGKEYS") || getenv("CT_BUGPAD");   // (the probes: no window on the player's screen)
   }
@@ -12421,7 +12466,10 @@ int main(int argc, char** argv) {
   SDL_Window* win = CtPresentWindow(pr);
   if (g_hostInteractive) {                             // the picture is placed by hostDstRect, the overlay on top
     hostApplyVideo(pr);
-    fprintf(stderr, "[video] %s\n", CtPresentName(pr));
+    { int ww = 0, wh = 0; SDL_GetWindowSize(win, &ww, &wh);
+      fprintf(stderr, "[video] %s; window %dx%d at display scale %.2f, %s\n", CtPresentName(pr), ww, wh,
+              hostDisplayScale(win), g_hostDpiAware >= 2 ? "per-monitor DPI-aware" : g_hostDpiAware == 1 ? "system DPI-aware"
+                                                                                                 : "DPI-unaware"); }
     if (CtOverlayInit(pr)) fprintf(stderr, "[options] F1: options (%s)\n", CtSettingsPath());
 #ifdef __APPLE__
     if (CtOverlayAvailable()) CtMacInstallSettingsMenu();
@@ -20913,8 +20961,8 @@ int main(int argc, char** argv) {
     if (wideW > CAMW) {
       int wm0, wm1; fieldWideMask(&f, wideW, &wm0, &wm1);
       static CtSceneLayers beyondL; int det = 0;     // (past the edge: the layers scrolling on their own -- fieldBeyondPixel)
-      if (wm0 > -(1 << 29) && f.sd && (det = fieldBeyondLayers(mot->o2x, mot->o2y, mot->o3x, mot->o3y)) != 0 &&
-          !CtFieldSceneLayers(f.sd, &beyondL)) det = 0;
+      if (wm0 > -(1 << 29) && f.sd && !fieldWideBlack(&f, wideW) &&
+          (det = fieldBeyondLayers(mot->o2x, mot->o2y, mot->o3x, mot->o3y)) != 0 && !CtFieldSceneLayers(f.sd, &beyondL)) det = 0;
       g_wideBeyond = det;
       for (int y = 0; y < ch; y++)
         for (int x = 0; x < wideW; x++) {
@@ -21125,8 +21173,8 @@ int main(int argc, char** argv) {
             } }
           static uint8_t bcov[FIELD_WMAX * CAMH];
           static CtSceneLayers bBeyondL; int bdet = 0;
-          if (bwm0 > -(1 << 29) && f.sd && (bdet = fieldBeyondLayers(mot->o2x, mot->o2y, mot->o3x, mot->o3y)) != 0 &&
-              !CtFieldSceneLayers(f.sd, &bBeyondL)) bdet = 0;
+          if (bwm0 > -(1 << 29) && f.sd && !fieldWideBlack(&f, bwW) &&
+              (bdet = fieldBeyondLayers(mot->o2x, mot->o2y, mot->o3x, mot->o3y)) != 0 && !CtFieldSceneLayers(f.sd, &bBeyondL)) bdet = 0;
           // The row's battle scroll (the shake, a line wave). The HUD band's rows carry no arena records (arenaRow != 3: the
           // view's HUD covers them), but their sides are the arena: they take the nearest arena row's, towards the screen's
           // middle first -- as their colour math does (btFxCompose's band rows) -- so the sides beside the HUD shake with the rest.
